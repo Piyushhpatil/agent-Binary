@@ -1,0 +1,40 @@
+# TaintWalk default configuration.
+# Paths may use ~ and $VARS. $GHIDRA_INSTALL_DIR, if set, overrides ghidra.install_dir.
+# Relative paths are relative to the repo root.
+
+ghidra:
+  install_dir: ~/opt/ghidra_12.1.4_PUBLIC
+  expected_version: "12.1.4"
+
+toolchain:
+  min_python: "3.11"
+  java_major: 21
+
+smoke:
+  out_dir: runs/p0-smoke
+  cflags: ["-g", "-O0", "-fno-inline"]
+
+# Phase 1 corpus (D-011 scope, D-013 selection, D-014 hardening).
+corpus:
+  juliet_root: corpus/juliet/C          # Juliet C/C++ 1.3, SHA-256 ada9d7e1...38eb
+  build_dir: corpus/build
+  manifest: corpus/manifest.json
+  seed: 20260925
+  total: 240
+  per_cell: 2                           # 13 x 9 = 117 cells -> 234, +6 seeded extras
+  cwes: [78, 121, 122, 124, 126, 127, 134, 190, 191, 369, 606, 680, 789]
+  flows: ["01", "31", "41", "42", "44", "45", "52", "54", "63"]
+  control_flows: ["01", "31"]           # single-function controls
+  # A functional variant is "external" if its name contains any of these.
+  external_sources: ["fgets", "fscanf", "listen_socket", "connect_socket",
+                     "rand", "environment", "file", "console"]
+  # Buffer classes: each cell = 1 external (index sink) + 1 fixed call/loop-sink case.
+  stratified_cwes: [121, 122, 124, 126, 127]
+  fixed_call_tokens: ["memcpy", "memmove", "ncpy", "cpy", "ncat", "cat"]
+  fixed_loop_tokens: ["loop"]
+  support_sources: ["io.c"]             # compiled into every binary; its functions are never labels
+  cflags: ["-g", "-O0", "-fno-inline",
+           "-fstack-protector-strong", "-fcf-protection=full",
+           "-fPIE", "-pie", "-U_FORTIFY_SOURCE",
+           "-DINCLUDEMAIN"]
+  jobs: 16
