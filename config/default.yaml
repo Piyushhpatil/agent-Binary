@@ -38,3 +38,15 @@ corpus:
            "-fPIE", "-pie", "-U_FORTIFY_SOURCE",
            "-DINCLUDEMAIN"]
   jobs: 16
+
+# Phase 2 extraction (D-015: structural, label-free scoping).
+extract:
+  out_dir: runs/p2-extract              # default for `extract --all`
+  smoke_dir: runs/p2-smoke              # default for single-binary extract
+  decompile_timeout_s: 60               # per function, passed to DecompInterface
+  binary_timeout_s: 300                 # wall clock for one export subprocess
+  jobs: 8                               # one JVM per job; ~1-2 GB each, 15 GiB available
+  min_recovery: 0.80                    # Phase 2 gate threshold
+  # Blocks whose functions are candidates for analysis. Everything else is excluded.
+  text_blocks: [".text"]
+  plt_blocks: [".plt", ".plt.sec", ".plt.got"]

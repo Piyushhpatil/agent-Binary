@@ -12,6 +12,7 @@ requires-python = ">=3.11"
 dependencies = [
     "pyyaml>=6",
     "pyelftools>=0.31",
+    "pydantic>=2.12",
 ]
 
 [project.scripts]
