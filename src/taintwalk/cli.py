@@ -121,6 +121,30 @@ def _cmd_extract(args: argparse.Namespace) -> int:
     return 0 if res.ok else 1
 
 
+def _cmd_label(args: argparse.Namespace) -> int:
+    from taintwalk.config import REPO_ROOT
+    from taintwalk.eval.join import run_label
+    run_dir = Path(args.run_dir)
+    if not run_dir.is_absolute():
+        run_dir = REPO_ROOT / run_dir
+    manifest = Path(args.manifest) if args.manifest else None
+    return run_label(run_dir, report=args.report, manifest_path=manifest)
+
+
+def _cmd_selftest(args: argparse.Namespace) -> int:
+    if not args.leak:
+        print("nothing selected; use --leak", file=sys.stderr)
+        return 2
+    from taintwalk.config import REPO_ROOT
+    from taintwalk.eval.selftest import run_leak_selftest
+    from taintwalk.extract.ghidra_runner import extract_cfg
+    d = Path(args.programs) if args.programs else Path(extract_cfg()["out_dir"]) / "programs"
+    if not d.is_absolute():
+        d = REPO_ROOT / d
+    manifest = Path(args.manifest) if args.manifest else None
+    return run_leak_selftest(d, manifest_path=manifest)
+
+
 def _add_scope_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--cwe", nargs="+", help="CWE classes (default: config corpus.cwes)")
     p.add_argument("--variants", nargs="+", help="Juliet flow variants (default: config corpus.flows)")
@@ -170,6 +194,18 @@ def build_parser() -> argparse.ArgumentParser:
     ext.add_argument("--decompile-timeout", type=int, help="seconds per function")
     ext.add_argument("--force", action="store_true", help="re-extract even if program.json is current")
     ext.set_defaults(func=_cmd_extract)
+
+    lab = sub.add_parser("label", help="join program.json to ground truth by address (eval side)")
+    lab.add_argument("run_dir", help="run dir holding program.json or programs/*.json")
+    lab.add_argument("--report", action="store_true", help="per-case table + label_report.json")
+    lab.add_argument("--manifest", help="manifest path (default: config corpus.manifest)")
+    lab.set_defaults(func=_cmd_label)
+
+    st = sub.add_parser("selftest", help="self-checks over real pipeline data")
+    st.add_argument("--leak", action="store_true", help="leak gate over every in-scope prompt input")
+    st.add_argument("--programs", help="dir of program.json files (default: <extract.out_dir>/programs)")
+    st.add_argument("--manifest", help="manifest path (default: config corpus.manifest)")
+    st.set_defaults(func=_cmd_selftest)
 
     return parser
 
