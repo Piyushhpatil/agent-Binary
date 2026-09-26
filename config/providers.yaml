@@ -1,0 +1,32 @@
+# LLM backends (D-002, D-007, D-019).
+# Every model/params/digest value here is part of the provider identity, so it is part of
+# the cache key: changing one invalidates that provider's cached completions, by design.
+
+cache_dir: runs/_cache/llm        # gitignored (under runs/); shared across runs
+default: anthropic                # D-002: cloud for headline results
+
+retry:                            # transport retries only; repair is separate (base.REPAIR_LIMIT)
+  max_retries: 4
+  backoff_base_s: 1.0
+  backoff_cap_s: 30.0
+
+providers:
+  anthropic:
+    model: claude-haiku-4-5-20251001   # dev loop and ping. Headline model decided before Phase 8 (D-007)
+    timeout_s: 120
+    params:
+      max_tokens: 1024
+      thinking: null                   # null = not sent; model default applies
+      effort: null
+
+  ollama:
+    model: ornith:9b                   # provisional (D-007): confirm or replace in Phase 5
+    digest: "a75697c14589"             # from `ollama list`. Quoted: YAML would turn all-digit hex into an int
+    base_url: http://127.0.0.1:11434
+    timeout_s: 600
+    params:
+      num_ctx: 16384                   # spike: 100% GPU at 16k on RTX 4060 8 GB
+      num_predict: 2048
+      think: false                     # ornith thinks by default; Phase 5 measures whether it helps
+      temperature: 0
+      seed: 0

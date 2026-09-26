@@ -145,6 +145,16 @@ def _cmd_selftest(args: argparse.Namespace) -> int:
     return run_leak_selftest(d, manifest_path=manifest)
 
 
+def _cmd_llm_ping(args: argparse.Namespace) -> int:
+    from taintwalk.llm.ping import run_ping
+    return run_ping(
+        args.provider,
+        use_cache=not args.no_cache,
+        retry_failed=args.retry_failed,
+        run_dir=args.run_dir,
+    )
+
+
 def _add_scope_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--cwe", nargs="+", help="CWE classes (default: config corpus.cwes)")
     p.add_argument("--variants", nargs="+", help="Juliet flow variants (default: config corpus.flows)")
@@ -206,6 +216,16 @@ def build_parser() -> argparse.ArgumentParser:
     st.add_argument("--programs", help="dir of program.json files (default: <extract.out_dir>/programs)")
     st.add_argument("--manifest", help="manifest path (default: config corpus.manifest)")
     st.set_defaults(func=_cmd_selftest)
+
+    llm = sub.add_parser("llm", help="LLM backends: health checks through the full provider pipeline")
+    lsub = llm.add_subparsers(dest="llm_command", required=True)
+
+    ping = lsub.add_parser("ping", help="one structured call: leak gate, cache, send, validate, usage")
+    ping.add_argument("--provider", help="provider name from config/providers.yaml (default: its 'default')")
+    ping.add_argument("--no-cache", action="store_true", help="bypass the disk cache and always call the model")
+    ping.add_argument("--retry-failed", action="store_true", help="re-call instead of replaying a cached failure")
+    ping.add_argument("--run-dir", help="where usage.json goes (default: runs/p4-ping)")
+    ping.set_defaults(func=_cmd_llm_ping)
 
     return parser
 
