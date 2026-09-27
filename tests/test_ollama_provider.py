@@ -1,7 +1,7 @@
 """Ollama backend against a local fake Ollama server: stdlib HTTP end to end, with no GPU
 and no model. Proves the request shape, the digest pin, cache-only replay with the
 server off, and both overflow defences against the silent front-truncation found in the
-Phase 4 spike."""
+Phase 4 spike, including on warm-cache replies (D-022)."""
 from __future__ import annotations
 
 import json
@@ -180,6 +180,29 @@ def test_silent_truncation_is_detected_and_not_cached(server, tmp_path):
     assert _files(tmp_path / "c") == [] and p.records == []
 
 
+def test_truncation_is_detected_on_a_warm_cache_reply(server, tmp_path):
+    # D-022: prompt_eval_cached_count is a subset of prompt_eval_count. Here ~4250 chars
+    # arrive as 500 evaluated tokens (~8.5 chars/token), so text went missing. The old
+    # formula divided by 500 + 495 (~4.3 chars/token) and would have let this through.
+    big = "int x;\n" * 600
+    server.script = [chat_ok(prompt_eval_count=500, prompt_eval_cached_count=495)]
+    p = provider(server.base_url, tmp_path)
+    with pytest.raises(ContextOverflow):
+        run(p, user=big)
+    assert _files(tmp_path / "c") == [] and p.records == []
+
+
+def test_warm_cache_reply_counts_prompt_tokens_once(server, tmp_path):
+    # A healthy warm reply: ~2.6 chars/token, as measured in the Phase 5 spike.
+    big = "int x;\n" * 600
+    server.script = [chat_ok(prompt_eval_count=1640, prompt_eval_cached_count=1636)]
+    comp = run(provider(server.base_url, tmp_path), user=big)
+    assert comp.ok
+    detail = comp.attempts[0]["detail"]
+    assert detail["prompt_tokens"] == 1640 and detail["cached_prompt_tokens"] == 1636
+    assert detail["chars_per_token"] == round((len(SYSTEM) + len(big)) / 1640, 2)
+
+
 def test_server_context_error_maps_to_overflow_without_retry(server, tmp_path):
     server.script = [http_error(400, '{"error":{"type":"exceed_context_size_error","n_ctx":1024}}')]
     p = provider(server.base_url, tmp_path)
@@ -225,7 +248,7 @@ def test_usage_maps_prompt_and_eval_counts(server, tmp_path):
     server.script = [chat_ok(prompt_eval_count=41, eval_count=25, prompt_eval_cached_count=5)]
     comp = run(provider(server.base_url, tmp_path))
     assert comp.usage == Usage(input_tokens=41, output_tokens=25, provider_cached_input_tokens=5)
-    assert comp.attempts[0]["detail"]["prompt_tokens"] == 46
+    assert comp.attempts[0]["detail"]["prompt_tokens"] == 41  # D-022: cached is not added
 
 
 # ---- residency and construction -------------------------------------------------------

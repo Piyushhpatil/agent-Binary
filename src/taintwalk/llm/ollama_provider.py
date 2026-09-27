@@ -1,4 +1,4 @@
-"""Local Ollama backend (Phase 4; D-007, D-019). Standard-library HTTP only.
+"""Local Ollama backend (Phase 4; D-007, D-019, D-022). Standard-library HTTP only.
 
 Findings from the Phase 4 spike (Ollama 0.34.4 on WSL2, RTX 4060 8 GB) that shape this file:
 
@@ -10,6 +10,9 @@ Findings from the Phase 4 spike (Ollama 0.34.4 on WSL2, RTX 4060 8 GB) that shap
        num_ctx - num_predict - TEMPLATE_OVERHEAD_TOKENS, or ContextOverflow before any I/O;
     2. post-check: more than MAX_CHARS_PER_TOKEN prompt characters per evaluated token
        means text went missing; the reply is reported as context_overflow, never cached.
+       The denominator is prompt_eval_count ALONE. prompt_eval_cached_count is a subset of
+       it, not an addition (Phase 5 spike: 949 cold with 0 cached, 949 warm with 945
+       cached). Adding the two halved the check's sensitivity on every warm call (D-022).
   Both thresholds are provisional. Every reply records chars_per_token so Phase 5 can
   calibrate them on real decompiled pseudo-C.
 - Thinking models think by default (ornith:9b spent 90 tokens on a 25-token answer).
@@ -190,11 +193,12 @@ class OllamaProvider(LLMProvider):
             raise ProviderConfigError(
                 "ollama reply lacks prompt_eval_count; cannot rule out silent prompt truncation"
             )
+        # D-022: the cached count is a subset of prompt_eval_count. Never add it.
         cached = r.get("prompt_eval_cached_count") or 0
-        prompt_tokens = evaluated + cached
-        ratio = prompt_chars / max(prompt_tokens, 1)
+        ratio = prompt_chars / max(evaluated, 1)
         detail: dict[str, Any] = {
-            "prompt_tokens": prompt_tokens,
+            "prompt_tokens": evaluated,
+            "cached_prompt_tokens": cached,
             "chars_per_token": round(ratio, 2),
             "done_reason": r.get("done_reason"),
         }
