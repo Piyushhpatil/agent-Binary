@@ -27,7 +27,6 @@ from taintwalk.util.leakcheck import assert_clean
 
 REPO = Path(__file__).resolve().parents[1]
 PROGRAMS = REPO / "runs/p2-extract/programs"
-EXPECT_IN_SCOPE = 11029
 DANGEROUS_IMPORTS = {"memcpy", "strcpy", "strcat", "sprintf", "gets", "memmove", "strncpy"}
 
 
@@ -89,10 +88,17 @@ def test_numbering_and_blank_edges():
     assert "   1  void FUN_1(void)" in user and "   4  }" in user
 
 
-def test_build_prompt_on_every_in_scope_function():
+def test_build_prompt_on_a_corpus_sample():
+    # Every 10th binary (24 of 240), plus tw-0187, which holds the largest scored function
+    # (pseudo-C survey). Gating all 11,029 prompts took ~50 s; gating every in-scope prompt
+    # input is `taintwalk selftest --leak`'s job, not a unit test's.
+    progs = _programs()
+    largest = [p for p in progs if p["binary"]["path"].endswith("/tw-0187.stripped.elf")]
+    assert len(largest) == 1
+    sample = progs[::10] + largest
     n = redactions = collapsed = 0
     biggest = 0
-    for prog in _programs():
+    for prog in sample:
         sha = prog["binary"]["sha256"]
         for fn in prog["functions"]:
             if not fn["in_scope"]:
@@ -105,9 +111,9 @@ def test_build_prompt_on_every_in_scope_function():
             redactions += p.redactions
             collapsed += p.collapsed
             biggest = max(biggest, len(p.system) + len(p.user))
-    print(f"\nprompts: {n} built, {redactions} literals redacted, {collapsed} store lines collapsed, "
-          f"system {len(SYSTEM)} chars, largest prompt {biggest} chars")
-    assert n == EXPECT_IN_SCOPE
+    print(f"\nprompts: {n} built from {len(sample)} binaries, {redactions} literals redacted, "
+          f"{collapsed} store lines collapsed, system {len(SYSTEM)} chars, largest prompt {biggest} chars")
+    assert n > 1000
     assert biggest <= 28544  # ollama preflight budget at num_ctx 16384 / num_predict 2048
 
 
