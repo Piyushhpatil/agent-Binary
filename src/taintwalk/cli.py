@@ -219,6 +219,56 @@ def _cmd_analyze_one(args: argparse.Namespace) -> int:
     return rc
 
 
+def _cmd_walk(args: argparse.Namespace) -> int:
+    """Phase 6: bottom-up interprocedural walk over one program.json (D-026). Label-free:
+    the input is a program.json and nothing from the eval side. --explain reads a finished
+    run dir and makes no model call."""
+    import json
+
+    from taintwalk.config import REPO_ROOT, load_config
+
+    def _abs(p: str | Path) -> Path:
+        p = Path(p)
+        return p if p.is_absolute() else REPO_ROOT / p
+
+    wcfg = load_config()["walk"]
+    run_dir = _abs(args.run_dir or wcfg["out_dir"])
+    if args.explain:
+        from taintwalk.analysis.walker import explain_function
+        return explain_function(run_dir, args.explain)
+    if not args.program:
+        print("give --program PATH, or --explain ADDR with --run-dir", file=sys.stderr)
+        return 2
+
+    from taintwalk.analysis.walker import walk_program, walk_report
+    from taintwalk.llm.base import LLMError
+    from taintwalk.llm.registry import get_provider, write_usage
+
+    prog = json.loads(_abs(args.program).read_text(encoding="utf-8"))
+    try:
+        cfg_path = _abs(args.providers_config) if args.providers_config else None
+        provider = get_provider(args.provider, use_cache=not args.no_cache, config_path=cfg_path)
+    except LLMError as e:
+        print(f"WALK FAIL: {type(e).__name__}: {e}")
+        return 1
+    print(f"provider: {provider.name}  model {provider.model}  "
+          f"cache {'on' if provider.cache is not None else 'OFF'}  run dir {run_dir}")
+    try:
+        result = walk_program(
+            provider, prog, run_dir,
+            max_chars=wcfg["callee_context_max_chars"],
+            max_iterations=wcfg["scc_max_iterations"],
+            retry_failed=args.retry_failed,
+            with_baseline=args.with_baseline,
+        )
+    except LLMError as e:
+        write_usage(run_dir, [provider])
+        print(f"WALK FAIL: {type(e).__name__}: {e}")
+        return 1
+    write_usage(run_dir, [provider])
+    return walk_report(result)
+
+
 def _add_scope_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--cwe", nargs="+", help="CWE classes (default: config corpus.cwes)")
     p.add_argument("--variants", nargs="+", help="Juliet flow variants (default: config corpus.flows)")
@@ -306,6 +356,19 @@ def build_parser() -> argparse.ArgumentParser:
     ao.add_argument("--no-cache", action="store_true", help="bypass the disk cache and always call the model")
     ao.add_argument("--retry-failed", action="store_true", help="re-call instead of replaying a cached failure")
     ao.set_defaults(func=_cmd_analyze_one)
+
+    wk = sub.add_parser("walk", help="bottom-up interprocedural walk over one program.json (Phase 6)")
+    wk.add_argument("--program", help="a program.json to walk")
+    wk.add_argument("--provider", help="provider name from config/providers.yaml (default: its 'default')")
+    wk.add_argument("--run-dir", help="output dir (default: config walk.out_dir)")
+    wk.add_argument("--explain", metavar="ADDR",
+                    help="show what the walk injected into one function's prompt; reads --run-dir, no model call")
+    wk.add_argument("--with-baseline", action="store_true",
+                    help="also re-run every function that had callee context without it (diagnostic)")
+    wk.add_argument("--providers-config", help="alternate providers.yaml")
+    wk.add_argument("--no-cache", action="store_true", help="bypass the disk cache and always call the model")
+    wk.add_argument("--retry-failed", action="store_true", help="re-call instead of replaying a cached failure")
+    wk.set_defaults(func=_cmd_walk)
 
     return parser
 

@@ -17,6 +17,7 @@ Writes, under the run dir (I2):
     walk.json        plan, skipped, components, per-function callee context and status
     baseline/        with_baseline: callers again with no callee context (a diagnostic only)
 LeakError is never caught: model output that trips the gate aborts the walk (D-017, D-026).
+explain_function() rebuilds what one prompt carried from these files alone, with no model call.
 """
 from __future__ import annotations
 
@@ -30,6 +31,7 @@ from taintwalk.analysis.analyze_one import analyze_function, stem
 from taintwalk.analysis.callgraph import CallGraph, addr_key, build_graph, plan_walk
 from taintwalk.analysis.prompts import (
     CALLEE_CONTEXT_VERSION,
+    CALLEE_HEADER,
     PROMPT_VERSION,
     SYSTEM,
     CalleeView,
@@ -240,3 +242,54 @@ def walk_report(result: dict[str, Any]) -> int:
     passed = complete and overflow == 0
     print("WALK OK" if passed else "WALK FAIL")
     return 0 if passed else 1
+
+
+def _verdict_text(record: dict[str, Any] | None) -> str:
+    if not record:
+        return "no summary"
+    v = record["summary"]["verdict"]
+    if v["mechanism"] == "none":
+        return "not vulnerable"
+    detail = "/".join(x for x in (v["region"], v["access"], v["direction"]) if x != "not_applicable")
+    return f"vulnerable, {v['mechanism']}" + (f" {detail}" if detail else "")
+
+
+def explain_function(run_dir: Path, addr: str) -> int:
+    """`walk --explain ADDR`: what the walk injected into one function's prompt and what it
+    concluded, with and without that context. Reads the run dir only; no model call (I2)."""
+    run_dir = Path(run_dir)
+    wpath = run_dir / "walk.json"
+    if not wpath.exists():
+        print(f"no walk.json in {run_dir}; run the walk first")
+        return 2
+    walk = json.loads(wpath.read_text(encoding="utf-8"))
+    sha = walk["binary_sha256"]
+    info = walk["functions"].get(addr)
+    if info is None:
+        why = ("skipped as isolated: its summary is exactly the per-function one"
+               if addr in walk["skipped_isolated"] else "not in this walk")
+        print(f"{addr}: {why}")
+        return 2
+    s = stem(sha, addr) + info.get("tag", "")
+    ppath = run_dir / "prompts" / f"{s}.json"
+    prompt = json.loads(ppath.read_text(encoding="utf-8")) if ppath.exists() else None
+    row = json.loads((run_dir / "summaries" / f"{s}.json").read_text(encoding="utf-8"))
+    bpath = run_dir / "baseline" / "summaries" / f"{stem(sha, addr)}.json"
+    base = json.loads(bpath.read_text(encoding="utf-8")) if bpath.exists() else None
+
+    status = info["status"] + (f" ({info['failure']})" if info["status"] != "ok" else "")
+    statuses = info.get("callee_statuses", {})
+    print(f"explain {addr} {info['function']}   binary {sha[:12]}   run {run_dir}")
+    print(f"status        : {status}   iteration {info.get('iteration', 0)}")
+    print("callees       : " + (", ".join(f"{a} {st}" for a, st in statuses.items()) or "none"))
+    if info.get("omitted"):
+        print(f"omitted       : {info['omitted']} (budget)")
+    print(f"walk verdict  : {_verdict_text(row.get('record'))}")
+    print(f"no context    : {_verdict_text(base.get('record')) if base else 'not run (walk with --with-baseline)'}")
+    user = prompt["user"] if prompt else ""
+    i = user.find(CALLEE_HEADER)
+    print("--- callee block injected into the prompt ---")
+    print(user[i:].rstrip("\n") if i >= 0 else
+          "(none: no callee context; this prompt equals the per-function prompt)")
+    print("--- end ---")
+    return 0

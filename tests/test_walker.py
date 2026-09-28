@@ -7,7 +7,7 @@ import pytest
 
 from llm_fakes import FakeProvider, ok_response
 from taintwalk.analysis.prompts import CALLEE_HEADER, build_prompt
-from taintwalk.analysis.walker import walk_program, walk_report
+from taintwalk.analysis.walker import explain_function, walk_program, walk_report
 from taintwalk.config import REPO_ROOT, load_config
 from taintwalk.util.leakcheck import LeakError
 
@@ -167,3 +167,37 @@ def test_decompile_failed_callee_is_a_stub_and_never_sent(tmp_path):
     assert res["rows"]["0x1300"]["failure"] == "decompile_failed"
     assert len(fake.calls) == 1
     assert "FUN_00101300, called on line 3: no summary (decompilation failed)" in fake.calls[0]["user"]
+
+
+def test_explain_reads_persisted_files_only(tmp_path, capsys):
+    p = prog([fn("0x1100", ["0x1300"]), fn("0x1300"), fn("0x1400")])
+    walk(p, scripted([resp(vulnerable=True), resp(vulnerable=True), resp()]), tmp_path, with_baseline=True)
+    capsys.readouterr()
+    assert explain_function(tmp_path, "0x1100") == 0            # no provider anywhere in this call
+    out = capsys.readouterr().out
+    assert CALLEE_HEADER in out and "FUN_00101300, called on line 3" in out
+    assert "walk verdict  : vulnerable, out_of_bounds_access stack/write/past_end" in out
+    assert "no context    : not vulnerable" in out
+    assert explain_function(tmp_path, "0x1300") == 0
+    assert "(none: no callee context" in capsys.readouterr().out
+    assert explain_function(tmp_path, "0x1400") == 2
+    assert "skipped as isolated" in capsys.readouterr().out
+    assert explain_function(tmp_path, "0x9999") == 2
+
+
+def test_cli_walk_arguments():
+    from taintwalk.cli import build_parser
+    a = build_parser().parse_args(["walk", "--program", "x.json", "--provider", "ollama", "--with-baseline"])
+    assert a.func.__name__ == "_cmd_walk" and a.with_baseline and a.program == "x.json" and a.explain is None
+    b = build_parser().parse_args(["walk", "--explain", "0x1c23", "--run-dir", "runs/p6-gate"])
+    assert b.explain == "0x1c23" and b.program is None
+
+
+def test_cli_walk_explain_end_to_end(tmp_path, capsys):
+    from taintwalk.cli import main
+    p = prog([fn("0x1100", ["0x1300"]), fn("0x1300")])
+    walk(p, scripted([resp(vulnerable=True), resp()]), tmp_path)
+    capsys.readouterr()
+    assert main(["walk", "--explain", "0x1100", "--run-dir", str(tmp_path)]) == 0
+    assert "--- callee block injected into the prompt ---" in capsys.readouterr().out
+    assert main(["walk", "--run-dir", str(tmp_path)]) == 2          # neither --program nor --explain
