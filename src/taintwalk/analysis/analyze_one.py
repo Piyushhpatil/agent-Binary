@@ -204,7 +204,7 @@ def analysis_report(rows: list[dict[str, Any]], run_dir: Path) -> int:
         print(f"failures           : {rep['failures']}")
     print(f"evidence issues    : {rep['functions_with_evidence_issues']} functions  {rep['evidence_issues']}")
     print(f"verdicts           : {rep['verdict_vulnerable']} vulnerable  {rep['mechanisms']}")
-    print(f"chars/token        : {rep['chars_per_token']}  [thresholds 2.0 preflight, 8.0 post-check]")
+    print(f"chars/token        : {rep['chars_per_token']}")
     print(f"tokens (this run)  : in {rep['tokens_in']}  out {rep['tokens_out']}  "
           f"model time {rep['model_wall_s']} s  cache hits {rep['cache_hits']}")
     print(f"leak gate          : {rep['prompts_gated']} prompts gated before any I/O; 0 violations "

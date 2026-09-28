@@ -198,7 +198,8 @@ def _cmd_analyze_one(args: argparse.Namespace) -> int:
         return 2
 
     try:
-        provider = get_provider(args.provider, use_cache=not args.no_cache)
+        cfg_path = _abs(args.providers_config) if args.providers_config else None
+        provider = get_provider(args.provider, use_cache=not args.no_cache, config_path=cfg_path)
     except LLMError as e:
         print(f"ANALYZE FAIL: {type(e).__name__}: {e}")
         return 1
@@ -301,6 +302,7 @@ def build_parser() -> argparse.ArgumentParser:
     ao.add_argument("--labels", help="dir of label files (default: <extract.out_dir>/labels)")
     ao.add_argument("--programs", help="dir of program.json files (default: <extract.out_dir>/programs)")
     ao.add_argument("--report", action="store_true", help="with --sample: verdict agreement vs labels")
+    ao.add_argument("--providers-config", help="alternate providers.yaml, e.g. for a model bake-off")
     ao.add_argument("--no-cache", action="store_true", help="bypass the disk cache and always call the model")
     ao.add_argument("--retry-failed", action="store_true", help="re-call instead of replaying a cached failure")
     ao.set_defaults(func=_cmd_analyze_one)
