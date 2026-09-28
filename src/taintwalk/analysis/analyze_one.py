@@ -10,6 +10,8 @@ and writes, under the run dir (I2):
     summaries/<stem>.json      the record plus provenance (sorted keys, D-019)
     analysis_report.json       label-free counts; the DoD gate is schema_valid >= 0.95
 A LeakError is never caught: a leaking prompt aborts the run loudly (D-017).
+The Phase 6 walk (D-026) reuses analyze_function() with a callee context, a stem tag and
+extra row fields; their defaults reproduce Phase 5 exactly.
 """
 from __future__ import annotations
 
@@ -86,13 +88,20 @@ def analyze_function(
     run_dir: Path,
     *,
     retry_failed: bool = False,
+    callee_context: str = "",
+    tag: str = "",
+    extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """One function -> one row. The defaults are Phase 5 exactly. The walk (D-026) passes
+    callee_context (appended after the numbered code), tag (a stem suffix such as ".it1", so
+    fixed-point iterations do not overwrite each other) and extra (fields merged into the row)."""
     sha = prog["binary"]["sha256"]
     fn = next((f for f in prog["functions"] if f["addr"] == addr), None)
     if fn is None or not fn["in_scope"] or fn.get("pseudo_c") is None:
         raise ValueError(f"{stem(sha, addr)}: not an in-scope function with pseudo-C")
     name = fn["ghidra_name"]
-    prompt = build_prompt(name, fn["pseudo_c"], binary_sha256=sha)   # gate inside
+    prompt = build_prompt(name, fn["pseudo_c"], binary_sha256=sha,     # gate inside
+                          callee_context=callee_context)
 
     t0 = time.monotonic()
     comp, overflow = None, ""
@@ -133,14 +142,16 @@ def analyze_function(
                                 summary=TaintSummary.model_validate(comp.data))
             row["record"] = rec.model_dump(mode="json")
             row["evidence_issues"] = [list(x) for x in evidence_issues(rec.summary, list(prompt.lines), name)]
+    if extra:
+        row.update(extra)
 
-    s = stem(sha, addr)
+    s = stem(sha, addr) + tag
     _write_json(Path(run_dir) / "prompts" / f"{s}.json", {
         "system_sha256": hashlib.sha256(prompt.system.encode()).hexdigest(),
         "user": prompt.user,
         "attempts": [{k: a.get(k) for k in ("text", "stop_reason", "error", "detail")} for a in attempts],
     })
-    _write_json(summary_path(run_dir, sha, addr), row)
+    _write_json(Path(run_dir) / "summaries" / f"{s}.json", row)
     return row
 
 
