@@ -50,3 +50,9 @@ extract:
   # Blocks whose functions are candidates for analysis. Everything else is excluded.
   text_blocks: [".text"]
   plt_blocks: [".plt", ".plt.sec", ".plt.got"]
+
+# Phase 6 walk (D-026).
+walk:
+  out_dir: runs/p6-walk                 # default --run-dir for `taintwalk walk`
+  callee_context_max_chars: 12000       # test: system + user + this cap <= 28,544-char preflight budget
+  scc_max_iterations: 3                 # fixed-point cap for recursive components

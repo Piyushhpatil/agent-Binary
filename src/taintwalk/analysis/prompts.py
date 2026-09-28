@@ -23,9 +23,15 @@ Design choices:
   on untrusted values is a flaw in itself. Both changes follow from definitions (the corpus
   strata of D-013; the integer_overflow wording below), not from fitting model output.
 - The prompt holds nothing that varies between runs, so the cache key is stable.
+- Phase 6 (D-026): build_prompt(callee_context=...) appends a block of callee summaries after
+  the numbered code, unnumbered. render_callee_context() builds it from structured fields only
+  (never a reason or a confidence), flattens and caps every model-written string, and drops
+  whole callees from the last call site backwards when the block would exceed its cap. An
+  empty block leaves the prompt byte-identical to v2, so SYSTEM and PROMPT_VERSION are unchanged.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from taintwalk.analysis.sanitize import collapse_decompiler_noise, redact_leaky_literals
@@ -343,10 +349,163 @@ def examples() -> list[tuple[str, tuple[str, ...], TaintSummary]]:
     return [(n, prepare_code(c)[0], TaintSummary.model_validate(s)) for n, c, s in _EXAMPLES]
 
 
-def build_prompt(function_name: str, pseudo_c: str, *, binary_sha256: str | None) -> Prompt:
+def build_prompt(function_name: str, pseudo_c: str, *, binary_sha256: str | None,
+                 callee_context: str = "") -> Prompt:
     """The only prompt builder. binary_sha256 is required, as in llm/base.py: pass the
-    stripped binary's sha for the full gate, or None explicitly for static-only."""
+    stripped binary's sha for the full gate, or None explicitly for static-only.
+
+    callee_context (Phase 6, D-026) is appended after the numbered code, unnumbered, so
+    evidence_line cannot shift. Empty leaves the prompt byte-identical to Phase 5."""
     lines, redactions, collapsed = prepare_code(pseudo_c)
     user = render_user(function_name, lines)
+    if callee_context:
+        user = user + "\n" + callee_context.rstrip("\n") + "\n"
     assert_clean(SYSTEM + "\n" + user, binary_sha256=binary_sha256)
     return Prompt(system=SYSTEM, user=user, lines=lines, redactions=redactions, collapsed=collapsed)
+
+
+# ---------------------------------------------------------------------------------------------
+# Phase 6: callee context (D-026)
+# ---------------------------------------------------------------------------------------------
+
+CALLEE_CONTEXT_VERSION = 1
+MODEL_TEXT_MAX = 120        # cap on any model-written string that re-enters a prompt
+
+CALLEE_HEADER = (
+    "Summaries of the functions this function calls, produced by the same analysis. Each one "
+    "describes that function on its own, without knowing what this function passes to it. "
+    "Parameter indexes are the callee's own (0 is its first parameter). A flow param:N -> sink:M "
+    "means the callee's parameter N reaches its dangerous operation M. Judge this function by "
+    "what it passes in and by what the callees return."
+)
+
+CALLEE_STATUSES = ("ok", "recursive_pending", "out_of_scope", "decompile_failed", "failed")
+
+_STUB_TEXT = {
+    "recursive_pending": "not yet available (recursive call); assume no taint effects",
+    "out_of_scope": "no summary (outside analysis scope)",
+    "decompile_failed": "no summary (decompilation failed)",
+}
+
+
+@dataclass(frozen=True)
+class CalleeView:
+    """What the walker knows about one callee when it builds a caller's prompt."""
+    addr: str
+    name: str
+    status: str
+    summary: dict | None = None     # TaintSummary as JSON; status "ok" only
+    failure: str = ""               # status "failed" only
+
+    def __post_init__(self) -> None:
+        if self.status not in CALLEE_STATUSES:
+            raise ValueError(f"unknown callee status {self.status!r}")
+        if (self.status == "ok") != (self.summary is not None):
+            raise ValueError("a summary is given exactly when status is 'ok'")
+
+
+@dataclass(frozen=True)
+class CalleeContext:
+    text: str                       # "" when there are no callees
+    order: tuple[str, ...]          # callee addrs rendered, in order
+    omitted: tuple[str, ...]        # callee addrs dropped for budget
+
+
+def _clean(value: object) -> str:
+    """Model-written text: one line, bounded, so it cannot forge entries or headers."""
+    s = " ".join(str(value).split())
+    return s if len(s) <= MODEL_TEXT_MAX else s[: MODEL_TEXT_MAX - 3] + "..."
+
+
+def _call_lines(name: str, lines: tuple[str, ...]) -> list[int]:
+    pat = re.compile(r"(?<!\w)" + re.escape(name) + r"(?!\w)")
+    return [i for i, ln in enumerate(lines, 1) if pat.search(ln)]
+
+
+def _endpoint(ep: str, sources: list[dict]) -> str:
+    kind, _, idx = ep.partition(":")
+    if kind == "source" and idx.isdigit() and int(idx) < len(sources):
+        src = sources[int(idx)]
+        return f"{src['kind']} {_clean(src['ref'])}".strip()
+    return ep
+
+
+def _render_ok(head: str, s: dict) -> str:
+    v = s["verdict"]
+    if not s["sinks"] and not s["propagation"] and not s["returns_taint"] and v["mechanism"] == "none":
+        return f"{head}: no taint effects (no sinks, no flows, returns no taint)"
+    params = "; ".join(
+        f"{p['index']} {p['role']}" + (f" ({_clean(p['inferred_type'])})" if p["inferred_type"] else "")
+        for p in s["params"]
+    )
+    flows = "; ".join(
+        f"{_endpoint(e['src'], s['sources'])} -> {_endpoint(e['dst'], s['sources'])}"
+        + (" (sanitized)" if e["sanitized"] else "")
+        for e in s["propagation"]
+    )
+    sinks = []
+    for i, k in enumerate(s["sinks"]):
+        t = f"sink:{i} {k['sink_kind']}" + (f" {_clean(k['callee'])}" if k["callee"] else "")
+        if k["guarded"]:
+            t += f", guarded: {_clean(k['guard_expr'])}" if k["guard_expr"] else ", guarded"
+        else:
+            t += ", unguarded"
+        sinks.append(t)
+    if v["mechanism"] == "none":
+        verdict = "not vulnerable"
+    else:
+        detail = "/".join(x for x in (v["region"], v["access"], v["direction"]) if x != "not_applicable")
+        verdict = f"vulnerable, {v['mechanism']}" + (f" {detail}" if detail else "")
+    return "\n".join([
+        head,
+        f"  params: {params or 'none'}",
+        f"  flows: {flows or 'none'}",
+        f"  sinks: {'; '.join(sinks) or 'none'}",
+        f"  returns taint: {'yes' if s['returns_taint'] else 'no'}",
+        f"  verdict: {verdict}",
+    ])
+
+
+def render_callee_context(caller_lines: tuple[str, ...], callees, *, max_chars: int) -> CalleeContext:
+    """The callee block for one caller. Callees are ordered by the first caller line that names
+    them (unnamed ones last, by address). Over max_chars, whole callees are dropped from the end
+    and a marker says how many."""
+    callees = list(callees)
+    if not callees:
+        return CalleeContext(text="", order=(), omitted=())
+    addrs = [c.addr for c in callees]
+    if len(set(addrs)) != len(addrs):
+        raise ValueError("duplicate callee address in callee context")
+
+    called = {c.addr: _call_lines(c.name, caller_lines) for c in callees}
+    ordered = sorted(callees, key=lambda c: (called[c.addr][0] if called[c.addr] else len(caller_lines) + 1,
+                                             int(c.addr, 16)))
+    entries = []
+    for c in ordered:
+        ln = called[c.addr]
+        head = c.name + (f", called on line{'s' if len(ln) > 1 else ''} {', '.join(map(str, ln))}" if ln else "")
+        if c.status == "ok":
+            s = TaintSummary.model_validate(c.summary).model_dump(mode="json")
+            entries.append(_render_ok(head, s))
+        elif c.status == "failed":
+            entries.append(f"{head}: no summary (analysis failed: {_clean(c.failure) or 'unknown'})")
+        else:
+            entries.append(f"{head}: {_STUB_TEXT[c.status]}")
+
+    kept = len(entries)
+    while True:
+        omitted = len(entries) - kept
+        parts = [CALLEE_HEADER, *entries[:kept]]
+        if omitted:
+            parts.append(f"{omitted} callee summar{'y' if omitted == 1 else 'ies'} omitted (budget)")
+        text = "\n".join(parts)
+        if len(text) <= max_chars:
+            break
+        if kept == 0:
+            raise ValueError(f"callee context cap {max_chars} cannot hold the header and the omission marker")
+        kept -= 1
+    return CalleeContext(
+        text=text,
+        order=tuple(c.addr for c in ordered[:kept]),
+        omitted=tuple(c.addr for c in ordered[kept:]),
+    )
