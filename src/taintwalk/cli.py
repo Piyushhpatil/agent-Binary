@@ -155,6 +155,68 @@ def _cmd_llm_ping(args: argparse.Namespace) -> int:
     )
 
 
+def _cmd_analyze_one(args: argparse.Namespace) -> int:
+    """Phase 5: one TaintSummary per function, no call graph. cli.py is glue: the eval side
+    (sample selection, agreement) and the analysis side (runner) never import each other's
+    ground truth; only sample.json, which holds (sha256, addr) pairs, crosses over."""
+    import json
+
+    from taintwalk.analysis.analyze_one import (
+        analysis_report,
+        load_programs,
+        load_sample,
+        run_analyze,
+    )
+    from taintwalk.config import REPO_ROOT
+    from taintwalk.extract.ghidra_runner import extract_cfg
+    from taintwalk.llm.base import LLMError
+    from taintwalk.llm.registry import get_provider, write_usage
+
+    def _abs(p: str | Path) -> Path:
+        p = Path(p)
+        return p if p.is_absolute() else REPO_ROOT / p
+
+    run_dir = _abs(args.run_dir)
+    if args.program:
+        if not args.addr or args.sample:
+            print("single mode needs --program PATH --addr ADDR, without --sample", file=sys.stderr)
+            return 2
+        prog = json.loads(_abs(args.program).read_text(encoding="utf-8"))
+        programs = {prog["binary"]["sha256"]: prog}
+        sample = [(prog["binary"]["sha256"], args.addr)]
+    elif args.sample:
+        from taintwalk.eval.sample import DEFAULT_SEED, select_sample, write_sample
+        seed = args.seed if args.seed is not None else DEFAULT_SEED
+        labels_dir = _abs(args.labels) if args.labels else _abs(Path(extract_cfg()["out_dir"]) / "labels")
+        s, key = select_sample(labels_dir, args.sample, seed)
+        sample = load_sample(write_sample(run_dir, s, key, seed=seed))
+        programs_dir = _abs(args.programs) if args.programs else _abs(Path(extract_cfg()["out_dir"]) / "programs")
+        programs = load_programs(programs_dir)
+    else:
+        print("give --sample N, or --program PATH --addr ADDR", file=sys.stderr)
+        return 2
+
+    try:
+        provider = get_provider(args.provider, use_cache=not args.no_cache)
+    except LLMError as e:
+        print(f"ANALYZE FAIL: {type(e).__name__}: {e}")
+        return 1
+    print(f"provider: {provider.name}  model {provider.model}  "
+          f"cache {'on' if provider.cache is not None else 'OFF'}  run dir {run_dir}")
+    try:
+        rows = run_analyze(provider, sample, programs, run_dir, retry_failed=args.retry_failed)
+    except LLMError as e:
+        write_usage(run_dir, [provider])
+        print(f"ANALYZE FAIL: {type(e).__name__}: {e}")
+        return 1
+    write_usage(run_dir, [provider])
+    rc = analysis_report(rows, run_dir)
+    if args.report and args.sample:
+        from taintwalk.eval.sample import agreement
+        agreement(run_dir)
+    return rc
+
+
 def _add_scope_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--cwe", nargs="+", help="CWE classes (default: config corpus.cwes)")
     p.add_argument("--variants", nargs="+", help="Juliet flow variants (default: config corpus.flows)")
@@ -226,6 +288,20 @@ def build_parser() -> argparse.ArgumentParser:
     ping.add_argument("--retry-failed", action="store_true", help="re-call instead of replaying a cached failure")
     ping.add_argument("--run-dir", help="where usage.json goes (default: runs/p4-ping)")
     ping.set_defaults(func=_cmd_llm_ping)
+
+    ao = sub.add_parser("analyze-one", help="one taint summary per function, no call graph (Phase 5)")
+    ao.add_argument("--sample", type=int, help="N functions picked on the eval side (flows 01/31, half bad)")
+    ao.add_argument("--program", help="single mode: a program.json")
+    ao.add_argument("--addr", help="single mode: function address as in program.json, e.g. 0x189d")
+    ao.add_argument("--provider", help="provider name from config/providers.yaml (default: its 'default')")
+    ao.add_argument("--run-dir", default="runs/p5-analyze", help="output dir (default: runs/p5-analyze)")
+    ao.add_argument("--seed", type=int, help="sample seed (default: eval.sample.DEFAULT_SEED)")
+    ao.add_argument("--labels", help="dir of label files (default: <extract.out_dir>/labels)")
+    ao.add_argument("--programs", help="dir of program.json files (default: <extract.out_dir>/programs)")
+    ao.add_argument("--report", action="store_true", help="with --sample: verdict agreement vs labels")
+    ao.add_argument("--no-cache", action="store_true", help="bypass the disk cache and always call the model")
+    ao.add_argument("--retry-failed", action="store_true", help="re-call instead of replaying a cached failure")
+    ao.set_defaults(func=_cmd_analyze_one)
 
     return parser
 
