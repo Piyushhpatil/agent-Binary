@@ -188,7 +188,8 @@ def _cmd_analyze_one(args: argparse.Namespace) -> int:
         from taintwalk.eval.sample import DEFAULT_SEED, select_sample, write_sample
         seed = args.seed if args.seed is not None else DEFAULT_SEED
         labels_dir = _abs(args.labels) if args.labels else _abs(Path(extract_cfg()["out_dir"]) / "labels")
-        s, key = select_sample(labels_dir, args.sample, seed)
+        exclude = set(load_sample(_abs(args.exclude))) if args.exclude else None
+        s, key = select_sample(labels_dir, args.sample, seed, exclude=exclude)
         sample = load_sample(write_sample(run_dir, s, key, seed=seed))
         programs_dir = _abs(args.programs) if args.programs else _abs(Path(extract_cfg()["out_dir"]) / "programs")
         programs = load_programs(programs_dir)
@@ -296,6 +297,7 @@ def build_parser() -> argparse.ArgumentParser:
     ao.add_argument("--provider", help="provider name from config/providers.yaml (default: its 'default')")
     ao.add_argument("--run-dir", default="runs/p5-analyze", help="output dir (default: runs/p5-analyze)")
     ao.add_argument("--seed", type=int, help="sample seed (default: eval.sample.DEFAULT_SEED)")
+    ao.add_argument("--exclude", help="with --sample: a sample.json whose functions must not be picked again")
     ao.add_argument("--labels", help="dir of label files (default: <extract.out_dir>/labels)")
     ao.add_argument("--programs", help="dir of program.json files (default: <extract.out_dir>/programs)")
     ao.add_argument("--report", action="store_true", help="with --sample: verdict agreement vs labels")

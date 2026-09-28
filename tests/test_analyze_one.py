@@ -128,3 +128,11 @@ def test_sample_selection_rules():
     assert [(k["sha256"], k["addr"]) for k in key] == [(s["sha256"], s["addr"]) for s in sample]
     assert select_sample(LABELS, 20, seed=20260927) == (sample, key)
     assert select_sample(LABELS, 20, seed=1)[0] != sample
+
+
+def test_sample_exclusion_gives_a_disjoint_held_out_set():
+    dev, _ = select_sample(LABELS, 20, seed=20260927)
+    used = {(s["sha256"], s["addr"]) for s in dev}
+    held, key = select_sample(LABELS, 20, seed=20260928, exclude=used)
+    assert used.isdisjoint((s["sha256"], s["addr"]) for s in held)
+    assert Counter(k["label"] for k in key) == {"bad": 10, "good": 10}

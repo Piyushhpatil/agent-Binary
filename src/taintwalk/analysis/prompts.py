@@ -13,11 +13,15 @@ Design choices:
   verdict last, so the model commits only after writing sources, sinks and flows.
 - The vocabulary is described in words; no CWE id appears anywhere (D-021; the gate
   would reject it).
-- Four hand-written few-shots, none taken from the corpus and none containing a string
+- Five hand-written few-shots, none taken from the corpus and none containing a string
   literal (D-021 forbids error-message literals; D-018 keeps them a Juliet shortcut risk,
   so the prompt must not teach "message => safe"). They cover: a dangerous loop with no
   dangerous call, a scary memcpy that is correctly bounded, an untrusted format string,
-  and a guarded divisor whose tainted value is returned (returns_taint for Phase 6).
+  a guarded divisor whose tainted value is returned (returns_taint for Phase 6), and a
+  constant-size overflow with no untrusted input at all (D-023).
+- v2 (D-023): flaws that need no untrusted input are in scope, and wrap-around arithmetic
+  on untrusted values is a flaw in itself. Both changes follow from definitions (the corpus
+  strata of D-013; the integer_overflow wording below), not from fitting model output.
 - The prompt holds nothing that varies between runs, so the cache key is stable.
 """
 from __future__ import annotations
@@ -28,7 +32,7 @@ from taintwalk.analysis.sanitize import collapse_decompiler_noise, redact_leaky_
 from taintwalk.analysis.summary_schema import TaintSummary
 from taintwalk.util.leakcheck import assert_clean
 
-PROMPT_VERSION = 1
+PROMPT_VERSION = 2
 
 _INSTRUCTIONS = """\
 You analyze one function decompiled by Ghidra from a stripped x86-64 Linux executable and \
@@ -54,13 +58,16 @@ and calls. List every dangerous operation it reaches:
 - the size or count given to a copy, or the bound of a copying loop;
 - an allocation size;
 - a divisor;
-- arithmetic that can wrap, when its result matters;
+- arithmetic on untrusted values that can wrap;
 - a format-string argument;
 - a command string given to a shell.
 An operation is guarded only when a check on the path constrains the untrusted value enough \
 to make that operation safe, for example both bounds of an index. A check of one side only, \
 or a check of a different variable, is not a guard. A dangerous-sounding call is not a flaw \
 by itself, and a plain loop or a plain assignment can be one.
+Also report any operation that is unsafe even with trusted values: a copy whose constant size \
+or source length is larger than its destination, or an index or pointer that is out of range \
+whatever the input. Such a sink has no source, so no propagation edge leads to it.
 
 Fields, in the order you write them. The verdict comes last and must follow from what you \
 listed before it.
@@ -68,13 +75,14 @@ listed before it.
 pointer, scalar, format, command or unknown.
 - sources: each untrusted value. kind is param, input_call, global or call_return. ref names \
 it: the parameter index as a string, or the called function's name.
-- sinks: each dangerous operation an untrusted value reaches. sink_kind is call_arg (an \
+- sinks: each dangerous operation an untrusted value reaches, and each operation that is \
+unsafe even with trusted values. sink_kind is call_arg (an \
 argument of a call), array_index (an index or offset into memory), pointer_write (a write \
 through a computed pointer), allocation_size, loop_bound, divisor or arithmetic. \
 evidence_line is the number of \
 the line where it happens. callee is the called function's name when the sink is a call \
 argument, otherwise "". tainted_args lists the 0-based positions of the call arguments that \
-carry untrusted data, or [] when the sink is not a call. guarded says whether a real guard \
+carry untrusted data, or [] when the sink is not a call or nothing untrusted reaches it. guarded says whether a real guard \
 protects it, and guard_expr quotes that check ("" when unguarded).
 - propagation: edges from src to dst. An endpoint is source:N, sink:N or param:N (N is the \
 position in that list, or the parameter index), or return. sanitized is true when the edge \
@@ -98,7 +106,8 @@ copy.
 upper limit.
 - untrusted_allocation_size: an untrusted value used as an allocation size with no limit.
 - other: a real memory-safety flaw that fits none of these.
-- none: no dangerous operation is reachable by untrusted data without a real guard.
+- none: no dangerous operation is reachable by untrusted data without a real guard, and \
+nothing is unsafe even with trusted values.
 For out_of_bounds_access, region is stack (a local buffer), heap (memory from malloc, calloc, \
 realloc or new), global (a DAT_ buffer) or unknown; access is read or write; direction is \
 past_end or before_start. For every other mechanism, region, access and direction are all \
@@ -250,6 +259,38 @@ int FUN_00101d20(void)
                           "callers must treat the return value as untrusted",
                 "mechanism": "none", "region": "not_applicable", "access": "not_applicable",
                 "direction": "not_applicable", "vulnerable": False, "confidence": 0.8,
+            },
+        },
+    ),
+    (
+        "FUN_00101e30",
+        """\
+void FUN_00101e30(void)
+{
+  char local_38 [40];
+  char local_98 [96];
+
+  memset(local_98,0x42,0x5f);
+  local_98[0x5f] = '\\0';
+  strcpy(local_38,local_98);
+  FUN_00101390(local_38);
+  return;
+}""",
+        {
+            "params": [],
+            "sources": [],
+            "sinks": [{
+                "sink_kind": "call_arg", "callee": "strcpy", "evidence_line": 8, "tainted_args": [],
+                "guarded": False, "guard_expr": "", "confidence": 0.9,
+            }],
+            "propagation": [],
+            "returns_taint": False,
+            "callee_effects": [{"callee": "FUN_00101390", "taints_return": False}],
+            "verdict": {
+                "reason": "strcpy copies a 95-character string into the 40-byte local_38; no "
+                          "untrusted data is involved, the sizes alone overflow the buffer",
+                "mechanism": "out_of_bounds_access", "region": "stack", "access": "write",
+                "direction": "past_end", "vulnerable": True, "confidence": 0.9,
             },
         },
     ),

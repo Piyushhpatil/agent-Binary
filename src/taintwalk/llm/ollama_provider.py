@@ -1,4 +1,4 @@
-"""Local Ollama backend (Phase 4; D-007, D-019, D-022). Standard-library HTTP only.
+"""Local Ollama backend (Phase 4; D-007, D-019, D-022, D-024). Standard-library HTTP only.
 
 Findings from the Phase 4 spike (Ollama 0.34.4 on WSL2, RTX 4060 8 GB) that shape this file:
 
@@ -13,8 +13,10 @@ Findings from the Phase 4 spike (Ollama 0.34.4 on WSL2, RTX 4060 8 GB) that shap
        The denominator is prompt_eval_count ALONE. prompt_eval_cached_count is a subset of
        it, not an addition (Phase 5 spike: 949 cold with 0 cached, 949 warm with 945
        cached). Adding the two halved the check's sensitivity on every warm call (D-022).
-  Both thresholds are provisional. Every reply records chars_per_token so Phase 5 can
-  calibrate them on real decompiled pseudo-C.
+  Calibrated in Phase 5 (D-024) on 20 real prompts (ornith:9b, ~9k-char system prompt plus
+  pseudo-C): 3.1 to 3.4 chars/token. The 2.0 preflight floor overestimates tokens by ~60%,
+  the safe direction, and stays. The post-check drops from 8.0 to 5.0: it now fires once
+  roughly a third of the prompt is missing instead of about 60%.
 - Thinking models think by default (ornith:9b spent 90 tokens on a 25-token answer).
   `think` is an explicit parameter and part of the cache key.
 - temperature 0 plus a fixed seed gave identical output on repeat for every model tried.
@@ -46,7 +48,7 @@ from taintwalk.llm.cache import DiskCache
 
 DEFAULT_BASE_URL = "http://127.0.0.1:11434"
 CHARS_PER_TOKEN_FLOOR = 2.0      # preflight: assume text is this dense (overestimates tokens)
-MAX_CHARS_PER_TOKEN = 8.0        # post-check: above this, prompt text went missing
+MAX_CHARS_PER_TOKEN = 5.0        # post-check: above this, prompt text went missing (D-024)
 TEMPLATE_OVERHEAD_TOKENS = 64    # chat template and role markers
 _RETRYABLE_STATUS = frozenset({408, 429})
 _MAX_ERROR_CHARS = 500

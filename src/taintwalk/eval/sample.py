@@ -13,6 +13,8 @@ Selection rule:
 - Half bad, half good, spread over every class: one pick per class per round, alternating
   labels, seeded. With n=20 and 13 classes, every class appears and 7 appear with both labels.
 - The final order is shuffled so labels do not alternate by position.
+- `exclude` removes (sha256, addr) pairs already used, e.g. the development sample, so a
+  held-out check never re-reads a function the prompt was reviewed on.
 """
 from __future__ import annotations
 
@@ -54,12 +56,16 @@ def _pools(labels_dir: Path) -> dict[tuple[str, str], list[dict[str, Any]]]:
     return pools
 
 
-def select_sample(labels_dir: Path, n: int, seed: int = DEFAULT_SEED) -> tuple[list[dict], list[dict]]:
+def select_sample(labels_dir: Path, n: int, seed: int = DEFAULT_SEED,
+                  exclude: set[tuple[str, str]] | None = None) -> tuple[list[dict], list[dict]]:
     """Return (sample, key). sample entries carry exactly sha256 and addr."""
     if n < 2:
         raise ValueError("n must be at least 2")
     rng = random.Random(seed)
     pools = _pools(labels_dir)
+    if exclude:
+        for k in pools:
+            pools[k] = [r for r in pools[k] if (r["sha256"], r["addr"]) not in exclude]
     classes = sorted({c for c, _ in pools})
     rng.shuffle(classes)
     want = {"bad": n // 2, "good": n - n // 2}

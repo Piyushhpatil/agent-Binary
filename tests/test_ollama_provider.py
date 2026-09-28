@@ -1,7 +1,7 @@
 """Ollama backend against a local fake Ollama server: stdlib HTTP end to end, with no GPU
 and no model. Proves the request shape, the digest pin, cache-only replay with the
 server off, and both overflow defences against the silent front-truncation found in the
-Phase 4 spike, including on warm-cache replies (D-022)."""
+Phase 4 spike, including on warm-cache replies (D-022) and at the calibrated threshold (D-024)."""
 from __future__ import annotations
 
 import json
@@ -201,6 +201,17 @@ def test_warm_cache_reply_counts_prompt_tokens_once(server, tmp_path):
     detail = comp.attempts[0]["detail"]
     assert detail["prompt_tokens"] == 1640 and detail["cached_prompt_tokens"] == 1636
     assert detail["chars_per_token"] == round((len(SYSTEM) + len(big)) / 1640, 2)
+
+
+def test_moderate_truncation_is_detected_at_the_calibrated_threshold(server, tmp_path):
+    # D-024: real prompts run 3.1-3.4 chars/token. ~5.3 chars/token means about 40% of the
+    # text is missing: caught at 5.0, missed at the old 8.0.
+    big = "int x;\n" * 600
+    server.script = [chat_ok(prompt_eval_count=800)]
+    p = provider(server.base_url, tmp_path)
+    with pytest.raises(ContextOverflow):
+        run(p, user=big)
+    assert _files(tmp_path / "c") == [] and p.records == []
 
 
 def test_server_context_error_maps_to_overflow_without_retry(server, tmp_path):

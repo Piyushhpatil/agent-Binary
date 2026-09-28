@@ -55,6 +55,8 @@ def test_fewshots_meet_d021_content_rules():
     assert any(s.verdict.vulnerable and all(k.callee == "" for k in s.sinks) for _, _, s in ex)
     # at least one example shows taint escaping through the return value (Phase 6 needs it)
     assert any(s.returns_taint for _, _, s in ex)
+    # D-023: at least one flaw that needs no untrusted input (no source, no propagation)
+    assert any(s.verdict.vulnerable and not s.sources and not s.propagation for _, _, s in ex)
 
 
 def test_fewshots_have_no_string_literals():
