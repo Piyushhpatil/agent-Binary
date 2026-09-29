@@ -269,6 +269,28 @@ def _cmd_walk(args: argparse.Namespace) -> int:
     return walk_report(result)
 
 
+def _cmd_score(args: argparse.Namespace) -> int:
+    """Phase 7: score walk run dirs under D-008 (eval side). Reads persisted files only: findings
+    are rebuilt from walk.json and summaries.json, and no provider is ever constructed."""
+    from taintwalk.config import REPO_ROOT
+    from taintwalk.eval.score import run_score
+    from taintwalk.extract.ghidra_runner import extract_cfg
+
+    def _abs(p: str | Path) -> Path:
+        p = Path(p)
+        return p if p.is_absolute() else REPO_ROOT / p
+
+    out = Path(extract_cfg()["out_dir"])
+    return run_score(
+        _abs(args.root),
+        report=args.report,
+        results_md=_abs(args.results_md) if args.results_md else None,
+        status=args.status,
+        labels_dir=_abs(args.labels) if args.labels else _abs(out / "labels"),
+        programs_dir=_abs(args.programs) if args.programs else _abs(out / "programs"),
+    )
+
+
 def _add_scope_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--cwe", nargs="+", help="CWE classes (default: config corpus.cwes)")
     p.add_argument("--variants", nargs="+", help="Juliet flow variants (default: config corpus.flows)")
@@ -369,6 +391,16 @@ def build_parser() -> argparse.ArgumentParser:
     wk.add_argument("--no-cache", action="store_true", help="bypass the disk cache and always call the model")
     wk.add_argument("--retry-failed", action="store_true", help="re-call instead of replaying a cached failure")
     wk.set_defaults(func=_cmd_walk)
+
+    sc = sub.add_parser("score", help="score walk run dirs against ground truth under D-008 (Phase 7)")
+    sc.add_argument("root", help="a walk run dir, or a dir holding walk run dirs (e.g. runs/p7-walk)")
+    sc.add_argument("--report", action="store_true",
+                    help="print every table: strata, typed ladder, class, flow, confidence, diagnostics")
+    sc.add_argument("--results-md", help="also write the tables as Markdown to this path")
+    sc.add_argument("--status", help="status line for the Markdown (default: development, not reportable)")
+    sc.add_argument("--labels", help="dir of label files (default: <extract.out_dir>/labels)")
+    sc.add_argument("--programs", help="dir of program.json files (default: <extract.out_dir>/programs)")
+    sc.set_defaults(func=_cmd_score)
 
     return parser
 
