@@ -22,6 +22,15 @@ Terminal outcomes (ok, schema failure, max_tokens, refusal) are cached, so an
 unchanged re-run costs zero tokens and replays identically (I2, I3). Transient errors
 and context overflow are raised, never cached.
 
+A raised LLMError (context overflow, retry exhaustion, a fatal provider error) is still
+recorded, as status "raised" with the tokens the call had already spent, so usage
+accounting never drops a partial call (D-032). Only the exception's type name is
+recorded, never its message.
+
+Offline mode (replay only, D-032): a cache miss raises OfflineMiss right after the cache
+lookup, before preflight or any network I/O. A replay is then free by construction,
+not merely because a token count happened to come back zero.
+
 A LeakError is never caught here. Its message holds ground-truth text; it must not
 reach a prompt, the repair loop, the cache, or a log line.
 """
@@ -77,6 +86,10 @@ class RetryExhausted(LLMError):
 
 class ContextOverflow(LLMError):
     """The prompt does not fit the model's context window. Never retried, never cached."""
+
+
+class OfflineMiss(LLMError):
+    """Offline mode (replay only) found no cached reply. Raised before any network I/O."""
 
 
 @dataclass(frozen=True)
@@ -196,6 +209,7 @@ class LLMProvider(ABC):
         params: dict[str, Any] | None = None,
         *,
         cache: DiskCache | None,
+        offline: bool = False,
         max_retries: int = 4,
         backoff_base_s: float = 1.0,
         backoff_cap_s: float = 30.0,
@@ -204,9 +218,12 @@ class LLMProvider(ABC):
     ) -> None:
         if not self.name:
             raise TypeError(f"{type(self).__name__} must set a class-level `name`")
+        if offline and cache is None:
+            raise ProviderConfigError("offline mode replays from the disk cache; it needs one")
         self.model = model
         self.params = dict(params or {})
         self.cache = cache
+        self.offline = offline
         self.max_retries = max_retries
         self.backoff_base_s = backoff_base_s
         self.backoff_cap_s = backoff_cap_s
@@ -234,7 +251,7 @@ class LLMProvider(ABC):
 
     @property
     def token_usage(self) -> Usage:
-        """Tokens spent by this provider instance. Cache hits contribute zero."""
+        """Tokens spent by this provider instance, raised calls included. Cache hits contribute zero."""
         total = Usage()
         for r in self.records:
             total = total + Usage(**r["usage"])
@@ -272,50 +289,71 @@ class LLMProvider(ABC):
                 self.records.append(hit.record(time.monotonic() - t0))
                 return hit
 
-        # 3. Send, validate, repair at most REPAIR_LIMIT times.
+        # 2b. Offline mode (replay only, D-032): a miss stops here, before preflight or any I/O.
+        if self.offline:
+            raise OfflineMiss(f"{self.name}/{self.model}: no cached reply for key {key[:16]}")
+
+        # 3. Send, validate, repair at most REPAIR_LIMIT times. A raised LLMError is recorded
+        #    with the tokens already spent, then re-raised (D-032). LeakError is not an
+        #    LLMError, so it passes through untouched (D-017, D-019).
         prompt = user
         attempts: list[dict[str, Any]] = []
         spent = Usage()
         repaired = False
-        while True:
-            self._preflight(system, prompt)
-            raw = self._send_with_retry(system, prompt, schema_json)
-            spent = spent + raw.usage
-            attempt: dict[str, Any] = {
-                "text": raw.text,
-                "stop_reason": raw.stop_reason,
-                "model": raw.model,
-                "request_id": raw.request_id,
-                "usage": asdict(raw.usage),
-                "detail": raw.detail,
-                "error": None,
-            }
-            attempts.append(attempt)
+        try:
+            while True:
+                self._preflight(system, prompt)
+                raw = self._send_with_retry(system, prompt, schema_json)
+                spent = spent + raw.usage
+                attempt: dict[str, Any] = {
+                    "text": raw.text,
+                    "stop_reason": raw.stop_reason,
+                    "model": raw.model,
+                    "request_id": raw.request_id,
+                    "usage": asdict(raw.usage),
+                    "detail": raw.detail,
+                    "error": None,
+                }
+                attempts.append(attempt)
 
-            if raw.stop_reason == STOP_OVERFLOW:
-                raise ContextOverflow(f"{self.name}/{self.model}: context window exceeded {raw.detail}")
-            if raw.stop_reason == STOP_REFUSAL:
-                status, data, failure = "failed", None, f"refusal:{raw.detail.get('category')}"
-                break
-            if raw.stop_reason == STOP_MAX_TOKENS:
-                status, data, failure = "failed", None, STOP_MAX_TOKENS
-                break
-            if raw.stop_reason != STOP_END:
-                status, data, failure = "failed", None, f"stop:{raw.stop_reason}"
-                break
-
-            try:
-                data = schema.model_validate_json(raw.text).model_dump(mode="json")
-                status, failure = "ok", None
-                break
-            except ValidationError as e:
-                attempt["error"] = _validation_summary(e)
-                if len(attempts) > REPAIR_LIMIT:
-                    status, data, failure = "failed", None, "schema"
+                if raw.stop_reason == STOP_OVERFLOW:
+                    raise ContextOverflow(f"{self.name}/{self.model}: context window exceeded {raw.detail}")
+                if raw.stop_reason == STOP_REFUSAL:
+                    status, data, failure = "failed", None, f"refusal:{raw.detail.get('category')}"
                     break
-                repaired = True
-                prompt = REPAIR_TEMPLATE.format(user=user, errors=attempt["error"])
-                self._gate(system, prompt, binary_sha256)
+                if raw.stop_reason == STOP_MAX_TOKENS:
+                    status, data, failure = "failed", None, STOP_MAX_TOKENS
+                    break
+                if raw.stop_reason != STOP_END:
+                    status, data, failure = "failed", None, f"stop:{raw.stop_reason}"
+                    break
+
+                try:
+                    data = schema.model_validate_json(raw.text).model_dump(mode="json")
+                    status, failure = "ok", None
+                    break
+                except ValidationError as e:
+                    attempt["error"] = _validation_summary(e)
+                    if len(attempts) > REPAIR_LIMIT:
+                        status, data, failure = "failed", None, "schema"
+                        break
+                    repaired = True
+                    prompt = REPAIR_TEMPLATE.format(user=user, errors=attempt["error"])
+                    self._gate(system, prompt, binary_sha256)
+        except LLMError as e:
+            self.records.append({
+                "key": key,
+                "provider": self.name,
+                "model": self.model,
+                "status": "raised",
+                "failure": type(e).__name__,
+                "cache_hit": False,
+                "repaired": repaired,
+                "attempts": len(attempts),
+                "usage": asdict(spent),
+                "wall_s": round(time.monotonic() - t0, 3),
+            })
+            raise
 
         comp = Completion(
             key=key,

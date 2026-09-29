@@ -3,6 +3,9 @@
 Phase 5 onward calls get_provider() and never imports a backend module, so analysis code
 never knows which backend it is talking to. Backends are imported lazily: an Ollama-only
 run never loads the Anthropic SDK.
+
+usage.json counts every call, including calls that raised after spending tokens (status
+"raised", D-032), and says whether the provider ran in offline (replay-only) mode.
 """
 from __future__ import annotations
 
@@ -42,10 +45,14 @@ def get_provider(
     name: str | None = None,
     *,
     use_cache: bool = True,
+    offline: bool = False,
     config_path: Path | None = None,
     **overrides: Any,
 ) -> LLMProvider:
-    """Build one provider. `overrides` replace retry settings (e.g. max_retries=0)."""
+    """Build one provider. `overrides` replace retry settings (e.g. max_retries=0).
+    offline=True is replay only: a cache miss raises OfflineMiss before any network I/O."""
+    if offline and not use_cache:
+        raise ProviderConfigError("offline mode replays from the disk cache; drop --no-cache")
     cfg = load_providers_config(config_path)
     name = name or cfg.get("default")
     spec = cfg["providers"].get(name)
@@ -63,12 +70,12 @@ def get_provider(
 
     if name == "anthropic":
         from taintwalk.llm.anthropic_provider import AnthropicProvider
-        return AnthropicProvider(
+        prov = AnthropicProvider(
             spec["model"], params, timeout_s=float(spec.get("timeout_s", 120)), **common
         )
-    if name == "ollama":
+    elif name == "ollama":
         from taintwalk.llm.ollama_provider import DEFAULT_BASE_URL, OllamaProvider
-        return OllamaProvider(
+        prov = OllamaProvider(
             spec["model"],
             params,
             digest=str(spec.get("digest") or ""),
@@ -76,16 +83,21 @@ def get_provider(
             timeout_s=float(spec.get("timeout_s", 600)),
             **common,
         )
-    raise ProviderConfigError(f"provider {name!r} is configured but has no backend in this build")
+    else:
+        raise ProviderConfigError(f"provider {name!r} is configured but has no backend in this build")
+    prov.offline = offline
+    return prov
 
 
 def usage_report(provider: LLMProvider) -> dict[str, Any]:
     recs = provider.records
     return {
         "identity": provider.identity(),
+        "offline": provider.offline,
         "calls": len(recs),
         "cache_hits": sum(1 for r in recs if r["cache_hit"]),
         "failed": sum(1 for r in recs if r["status"] == "failed"),
+        "raised": sum(1 for r in recs if r["status"] == "raised"),
         "repaired": sum(1 for r in recs if r["repaired"]),
         "transient_retries": provider.transient_retries,
         "tokens_spent": asdict(provider.token_usage),

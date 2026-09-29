@@ -116,6 +116,13 @@ def _files(root: Path) -> list[Path]:
     return [p for p in root.rglob("*") if p.is_file()] if root.exists() else []
 
 
+def _raised(p: OllamaProvider) -> dict[str, Any]:
+    """D-032: a raised call is never cached, but it leaves exactly one record with its tokens."""
+    (rec,) = p.records
+    assert rec["status"] == "raised" and rec["failure"] == "ContextOverflow"
+    return rec
+
+
 # ---- request shape and cache ----------------------------------------------------------
 
 def test_success_and_request_shape(server, tmp_path):
@@ -177,7 +184,9 @@ def test_silent_truncation_is_detected_and_not_cached(server, tmp_path):
     p = provider(server.base_url, tmp_path)
     with pytest.raises(ContextOverflow):
         run(p, user=big)
-    assert _files(tmp_path / "c") == [] and p.records == []
+    assert _files(tmp_path / "c") == []
+    rec = _raised(p)
+    assert rec["usage"]["input_tokens"] == 100 and rec["usage"]["output_tokens"] == 20
 
 
 def test_truncation_is_detected_on_a_warm_cache_reply(server, tmp_path):
@@ -189,7 +198,9 @@ def test_truncation_is_detected_on_a_warm_cache_reply(server, tmp_path):
     p = provider(server.base_url, tmp_path)
     with pytest.raises(ContextOverflow):
         run(p, user=big)
-    assert _files(tmp_path / "c") == [] and p.records == []
+    assert _files(tmp_path / "c") == []
+    rec = _raised(p)
+    assert rec["usage"]["input_tokens"] == 500 and rec["usage"]["provider_cached_input_tokens"] == 495
 
 
 def test_warm_cache_reply_counts_prompt_tokens_once(server, tmp_path):
@@ -211,7 +222,9 @@ def test_moderate_truncation_is_detected_at_the_calibrated_threshold(server, tmp
     p = provider(server.base_url, tmp_path)
     with pytest.raises(ContextOverflow):
         run(p, user=big)
-    assert _files(tmp_path / "c") == [] and p.records == []
+    assert _files(tmp_path / "c") == []
+    rec = _raised(p)
+    assert rec["usage"]["input_tokens"] == 800 and rec["usage"]["output_tokens"] == 20
 
 
 def test_server_context_error_maps_to_overflow_without_retry(server, tmp_path):

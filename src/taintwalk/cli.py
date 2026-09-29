@@ -247,12 +247,14 @@ def _cmd_walk(args: argparse.Namespace) -> int:
     prog = json.loads(_abs(args.program).read_text(encoding="utf-8"))
     try:
         cfg_path = _abs(args.providers_config) if args.providers_config else None
-        provider = get_provider(args.provider, use_cache=not args.no_cache, config_path=cfg_path)
+        provider = get_provider(args.provider, use_cache=not args.no_cache, config_path=cfg_path,
+                                offline=args.offline)
     except LLMError as e:
         print(f"WALK FAIL: {type(e).__name__}: {e}")
         return 1
     print(f"provider: {provider.name}  model {provider.model}  "
-          f"cache {'on' if provider.cache is not None else 'OFF'}  run dir {run_dir}")
+          f"cache {'on' if provider.cache is not None else 'OFF'}"
+          f"{'  OFFLINE (replay only)' if provider.offline else ''}  run dir {run_dir}")
     try:
         result = walk_program(
             provider, prog, run_dir,
@@ -390,6 +392,8 @@ def build_parser() -> argparse.ArgumentParser:
     wk.add_argument("--providers-config", help="alternate providers.yaml")
     wk.add_argument("--no-cache", action="store_true", help="bypass the disk cache and always call the model")
     wk.add_argument("--retry-failed", action="store_true", help="re-call instead of replaying a cached failure")
+    wk.add_argument("--offline", action="store_true",
+                    help="replay only: a cache miss stops the walk before any model call (needs the cache)")
     wk.set_defaults(func=_cmd_walk)
 
     sc = sub.add_parser("score", help="score walk run dirs against ground truth under D-008 (Phase 7)")

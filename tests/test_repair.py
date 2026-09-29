@@ -1,6 +1,7 @@
 """Retry vs repair (D-019). Retry = transport failure, same request, backoff.
 Repair = content failure, a different request, at most once, never echoing model output.
-Refusals, max_tokens, and config errors are terminal: neither retried nor repaired."""
+Refusals, max_tokens, and config errors are terminal: neither retried nor repaired.
+Raised outcomes are never cached, but they are recorded with the tokens they spent (D-032)."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -116,7 +117,10 @@ def test_context_overflow_raises_and_is_not_cached(tmp_path):
     prov = FakeProvider([ok_response(text="", stop_reason=STOP_OVERFLOW)], cache=DiskCache(tmp_path))
     with pytest.raises(ContextOverflow):
         _run(prov)
-    assert _files(tmp_path) == [] and prov.records == []
+    assert _files(tmp_path) == []  # never cached (D-019)
+    (rec,) = prov.records  # but recorded with what the reply spent (D-032)
+    assert rec["status"] == "raised" and rec["failure"] == "ContextOverflow"
+    assert rec["usage"]["input_tokens"] == 40 and rec["usage"]["output_tokens"] == 20
 
 
 # ---- retry ----------------------------------------------------------------------------
@@ -152,7 +156,10 @@ def test_retry_exhaustion_raises_and_caches_nothing(tmp_path):
     with pytest.raises(RetryExhausted):
         _run(prov)
     assert len(prov.calls) == 3 and len(prov.sleeps) == 2
-    assert _files(tmp_path) == [] and prov.records == []
+    assert _files(tmp_path) == []  # never cached (D-019)
+    (rec,) = prov.records  # recorded although no reply ever arrived (D-032)
+    assert rec["status"] == "raised" and rec["failure"] == "RetryExhausted"
+    assert rec["attempts"] == 0 and rec["usage"]["input_tokens"] == 0 and rec["usage"]["output_tokens"] == 0
 
 
 def test_config_error_is_never_retried(tmp_path):
