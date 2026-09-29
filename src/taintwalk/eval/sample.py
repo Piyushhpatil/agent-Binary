@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from taintwalk.analysis.analyze_one import stem, summary_path
+from taintwalk.config import REPO_ROOT
 
 FLOWS = ("01", "31")
 DEFAULT_SEED = 20260927
@@ -135,3 +136,59 @@ def agreement(run_dir: Path) -> dict[str, Any]:
     doc = {"functions": n, "cells": dict(cells), "rows": rows}
     (run_dir / "eval" / "agreement.json").write_text(json.dumps(doc, indent=1) + "\n", encoding="utf-8")
     return doc
+
+
+SHAKEDOWN_SEED = 20260929
+SHAKEDOWN_FIXED_FLOWS = 3
+
+
+def select_binaries(manifest: dict[str, Any], seed: int = SHAKEDOWN_SEED, *,
+                    fixed_flows: int = SHAKEDOWN_FIXED_FLOWS) -> list[dict[str, Any]]:
+    """Phase 7 scorer shakedown sample (D-028): one external binary per flow variant, plus
+    `fixed_flows` fixed-sink binaries from as many different flows. Seeded, and independent of
+    manifest order. The rows carry the class, so they stay on the eval side; the analysis side
+    gets only program.json paths (write_shakedown)."""
+    cells: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for e in manifest["entries"]:
+        cells[(e["stratum"], e["flow_variant"])].append(e)
+    for k in cells:
+        cells[k].sort(key=lambda e: e["case_id"])
+    rng = random.Random(seed)
+    picks: list[dict[str, Any]] = []
+    for f in sorted({f for _, f in cells}):
+        pool = cells.get(("external", f))
+        if not pool:
+            raise ValueError(f"no external binary in flow {f}")
+        picks.append(pool[rng.randrange(len(pool))])
+    fixed = sorted(f for s, f in cells if s == "fixed_sink")
+    if len(fixed) < fixed_flows:
+        raise ValueError(f"only {len(fixed)} flows have fixed-sink binaries; need {fixed_flows}")
+    for f in sorted(rng.sample(fixed, fixed_flows)):
+        pool = cells[("fixed_sink", f)]
+        picks.append(pool[rng.randrange(len(pool))])
+    return [{"case_id": e["case_id"], "sha256": e["stripped_sha256"], "cwe": e["cwe"],
+             "flow_variant": e["flow_variant"], "stratum": e["stratum"]} for e in picks]
+
+
+def write_shakedown(run_dir: Path, manifest: dict[str, Any], programs_dir: Path, *,
+                    seed: int = SHAKEDOWN_SEED) -> list[dict[str, Any]]:
+    """Write run_dir/programs.txt (program.json paths only, one per line, for the walk loop) and
+    run_dir/eval/shakedown_key.json (the eval-side rows). Every program file must exist and carry
+    the manifest's stripped sha256 (D-017); anything else fails closed."""
+    run_dir, programs_dir = Path(run_dir), Path(programs_dir)
+    rows = select_binaries(manifest, seed)
+    root = Path(REPO_ROOT).resolve()
+    lines = []
+    for r in rows:
+        p = (programs_dir / f"{r['case_id']}.json").resolve()
+        if not p.exists():
+            raise FileNotFoundError(f"{p} is missing; run `taintwalk extract --all` first")
+        sha = json.loads(p.read_text(encoding="utf-8"))["binary"]["sha256"]
+        if sha != r["sha256"]:
+            raise ValueError(f"{p.name}: binary sha256 {sha[:12]} != manifest {r['sha256'][:12]}")
+        lines.append(str(p.relative_to(root)) if p.is_relative_to(root) else str(p))
+    (run_dir / "eval").mkdir(parents=True, exist_ok=True)
+    (run_dir / "programs.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (run_dir / "eval" / "shakedown_key.json").write_text(
+        json.dumps({"seed": seed, "binaries": rows}, indent=1) + "\n", encoding="utf-8")
+    return rows
