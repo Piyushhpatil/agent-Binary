@@ -16,6 +16,18 @@ logged, tested retry policy; two stacked retry layers multiply and hide rate lim
 
 The SDK version is part of identity(): transform_schema() is SDK code, so a different
 SDK can send a different schema for the same prompt. An SDK upgrade invalidates the cache.
+
+Phase 8 (D-031, headline model):
+- The system prompt goes as one text block with an explicit ephemeral cache breakpoint. Automatic
+  caching (a top-level cache_control) would put the breakpoint on the per-function user message,
+  which changes every call, so every request would write the cache and none would read it. Prompt
+  caching changes billing and latency, never the reply, so it is not part of identity().
+- Usage: input_tokens counts only the tokens after the breakpoint. Cache reads are recorded as
+  provider_cached_input_tokens; cache writes go into the reply's detail (cache_creation_input_tokens),
+  where eval/cost.py prices them.
+- Only text blocks are read. Adaptive thinking returns thinking blocks first; they are ignored.
+- Server-side fallback is never requested: a refusal stays a refusal (an abstention under D-008),
+  never a silent answer from another model.
 """
 from __future__ import annotations
 
@@ -106,7 +118,7 @@ class AnthropicProvider(LLMProvider):
         req: dict[str, Any] = {
             "model": self.model,
             "max_tokens": self.params["max_tokens"],
-            "system": system,
+            "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
             "messages": [{"role": "user", "content": user}],
             "output_config": output_config,
         }
@@ -142,7 +154,7 @@ class AnthropicProvider(LLMProvider):
             thinking_tokens=thinking,
             provider_cached_input_tokens=getattr(u, "cache_read_input_tokens", 0) or 0,
         )
-        detail: dict[str, Any] = {}
+        detail: dict[str, Any] = {"cache_creation_input_tokens": getattr(u, "cache_creation_input_tokens", 0) or 0}
         stop_details = getattr(r, "stop_details", None)
         if stop_details is not None:
             category = (

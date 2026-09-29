@@ -1,6 +1,7 @@
 """Anthropic backend against a local fake API server: the real SDK, real HTTP, and the
 SDK's real exception classes, with no network and no credits. Proves the request shape
-(no sampling params, transformed schema) and the error taxonomy (retry vs fatal)."""
+(no sampling params, transformed schema, system-prompt cache breakpoint), the error taxonomy
+(retry vs fatal), and the Phase 8 reply handling (thinking blocks, cache token counts)."""
 from __future__ import annotations
 
 import json
@@ -111,7 +112,9 @@ def test_success_and_request_shape(api, tmp_path):
     (req,) = api.requests
     assert req["path"] == "/v1/messages"
     body = req["body"]
-    assert body["model"] == MODEL and body["max_tokens"] == 256 and body["system"] == SYSTEM
+    assert body["model"] == MODEL and body["max_tokens"] == 256
+    assert body["system"] == [{"type": "text", "text": SYSTEM, "cache_control": {"type": "ephemeral"}}]
+    assert "cache_control" not in body  # an explicit breakpoint on the system prompt, not automatic caching
     assert body["messages"] == [{"role": "user", "content": USER}]
     fmt = body["output_config"]["format"]
     assert fmt["type"] == "json_schema"
@@ -135,6 +138,23 @@ def test_second_call_is_a_cache_hit_with_no_request(api, tmp_path):
     comp = run(provider(api, tmp_path))
     assert comp.cache_hit and comp.usage == Usage()
     assert len(api.requests) == 1
+
+
+def test_prompt_cache_token_counts_are_recorded(api, tmp_path):
+    status, headers, body = message()
+    body["usage"].update(cache_read_input_tokens=2800, cache_creation_input_tokens=150)
+    api.script = [(status, headers, body)]
+    comp = run(provider(api, tmp_path))
+    assert comp.usage.provider_cached_input_tokens == 2800
+    assert comp.attempts[0]["detail"]["cache_creation_input_tokens"] == 150
+
+
+def test_thinking_blocks_before_the_json_are_ignored(api, tmp_path):
+    status, headers, body = message()
+    body["content"] = [{"type": "thinking", "thinking": "", "signature": "sig"}, *body["content"]]
+    api.script = [(status, headers, body)]
+    comp = run(provider(api, tmp_path))
+    assert comp.ok and comp.data == {"ok": True, "echo": "taintwalk", "count": 3}
 
 
 # ---- error taxonomy -------------------------------------------------------------------
