@@ -222,7 +222,8 @@ def _cmd_analyze_one(args: argparse.Namespace) -> int:
 def _cmd_walk(args: argparse.Namespace) -> int:
     """Phase 6: bottom-up interprocedural walk over one program.json (D-026). Label-free:
     the input is a program.json and nothing from the eval side. --explain reads a finished
-    run dir and makes no model call."""
+    run dir and makes no model call. --all (Phase 8, D-032) walks every program in a list,
+    one `taintwalk walk` subprocess and one run dir each."""
     import json
 
     from taintwalk.config import REPO_ROOT, load_config
@@ -231,13 +232,28 @@ def _cmd_walk(args: argparse.Namespace) -> int:
         p = Path(p)
         return p if p.is_absolute() else REPO_ROOT / p
 
+    if args.all:
+        if args.program or args.explain:
+            print("--all walks the programs in --programs; drop --program and --explain", file=sys.stderr)
+            return 2
+        if not args.programs or not args.run_dir:
+            print("--all needs --programs LIST|DIR and --run-dir ROOT", file=sys.stderr)
+            return 2
+        from taintwalk.analysis.walk_all import run_walk_all
+        return run_walk_all(
+            _abs(args.programs), _abs(args.run_dir), jobs=args.jobs, provider=args.provider,
+            providers_config=_abs(args.providers_config) if args.providers_config else None,
+            with_baseline=args.with_baseline, offline=args.offline,
+            no_cache=args.no_cache, retry_failed=args.retry_failed,
+        )
+
     wcfg = load_config()["walk"]
     run_dir = _abs(args.run_dir or wcfg["out_dir"])
     if args.explain:
         from taintwalk.analysis.walker import explain_function
         return explain_function(run_dir, args.explain)
     if not args.program:
-        print("give --program PATH, or --explain ADDR with --run-dir", file=sys.stderr)
+        print("give --program PATH, --all with --programs, or --explain ADDR with --run-dir", file=sys.stderr)
         return 2
 
     from taintwalk.analysis.walker import walk_program, walk_report
@@ -384,7 +400,8 @@ def build_parser() -> argparse.ArgumentParser:
     wk = sub.add_parser("walk", help="bottom-up interprocedural walk over one program.json (Phase 6)")
     wk.add_argument("--program", help="a program.json to walk")
     wk.add_argument("--provider", help="provider name from config/providers.yaml (default: its 'default')")
-    wk.add_argument("--run-dir", help="output dir (default: config walk.out_dir)")
+    wk.add_argument("--run-dir",
+                    help="output dir (default: config walk.out_dir); with --all, the root of one run dir per program")
     wk.add_argument("--explain", metavar="ADDR",
                     help="show what the walk injected into one function's prompt; reads --run-dir, no model call")
     wk.add_argument("--with-baseline", action="store_true",
@@ -394,6 +411,12 @@ def build_parser() -> argparse.ArgumentParser:
     wk.add_argument("--retry-failed", action="store_true", help="re-call instead of replaying a cached failure")
     wk.add_argument("--offline", action="store_true",
                     help="replay only: a cache miss stops the walk before any model call (needs the cache)")
+    wk.add_argument("--all", action="store_true",
+                    help="walk every program in --programs, one subprocess and one run dir each (Phase 8)")
+    wk.add_argument("--programs", metavar="LIST|DIR",
+                    help="with --all: a text file of program.json paths, or a directory of them")
+    wk.add_argument("--jobs", type=int, default=1,
+                    help="with --all: programs walked at the same time (default 1)")
     wk.set_defaults(func=_cmd_walk)
 
     sc = sub.add_parser("score", help="score walk run dirs against ground truth under D-008 (Phase 7)")
