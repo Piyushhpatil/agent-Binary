@@ -42,7 +42,8 @@ def test_real_config_builds_both_providers_offline():
     assert cache_dir(cfg) == REPO_ROOT / "runs/_cache/llm"
     a = get_provider("anthropic", use_cache=False)
     o = get_provider("ollama", use_cache=False)
-    assert isinstance(a, AnthropicProvider) and a.model == "claude-haiku-4-5-20251001"
+    assert isinstance(a, AnthropicProvider) and a.model == "claude-sonnet-5-5"  # D-031
+    assert a.params == {"max_tokens": 16000, "thinking": {"type": "adaptive"}, "effort": "high"}
     assert isinstance(o, OllamaProvider) and o.model == "ornith:9b"
     assert o.digest == "a75697c14589" and o.params["think"] is False
     assert o.params["num_ctx"] == 16384

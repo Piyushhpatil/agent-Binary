@@ -12,12 +12,12 @@ retry:                            # transport retries only; repair is separate (
 
 providers:
   anthropic:
-    model: claude-haiku-4-5-20251001   # dev loop and ping. Headline model decided before Phase 8 (D-007)
-    timeout_s: 120
+    model: claude-sonnet-5-5           # D-031: headline and only cloud model (was claude-haiku-4-5-20251001)
+    timeout_s: 600                     # adaptive thinking at high effort can take minutes
     params:
-      max_tokens: 1024
-      thinking: null                   # null = not sent; model default applies
-      effort: null
+      max_tokens: 16000                # D-031 thinking rule: 16000 adaptive; 2048 if the probe switches to between_tools
+      thinking: {type: adaptive}       # sent explicitly: server defaults can move (D-031)
+      effort: high
 
   ollama:
     model: ornith:9b                   # provisional (D-007): confirm or replace in Phase 5

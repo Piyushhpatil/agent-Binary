@@ -309,6 +309,13 @@ def _cmd_score(args: argparse.Namespace) -> int:
     )
 
 
+def _cmd_eval(args: argparse.Namespace) -> int:
+    """Reached only through build_parser(): main() hands `taintwalk eval ...` to eval/pipeline.py,
+    which owns the options (Phase 8, D-032)."""
+    print("run `taintwalk eval --help` for the options", file=sys.stderr)
+    return 2
+
+
 def _add_scope_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--cwe", nargs="+", help="CWE classes (default: config corpus.cwes)")
     p.add_argument("--variants", nargs="+", help="Juliet flow variants (default: config corpus.flows)")
@@ -429,10 +436,20 @@ def build_parser() -> argparse.ArgumentParser:
     sc.add_argument("--programs", help="dir of program.json files (default: <extract.out_dir>/programs)")
     sc.set_defaults(func=_cmd_score)
 
+    ev = sub.add_parser("eval", help="score all seven rungs, run the pre-registered tests, write RESULTS.md "
+                                     "(Phase 8; options: taintwalk eval --help)")
+    ev.set_defaults(func=_cmd_eval)
+
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else list(argv)
+    if argv[:1] == ["eval"]:
+        # eval/pipeline.py owns eval's options. Importing it only here keeps every other command,
+        # including the walk subprocesses, free of eval-side imports.
+        from taintwalk.eval.pipeline import main as eval_main
+        return eval_main(argv[1:])
     args = build_parser().parse_args(argv)
     return int(args.func(args))
 
