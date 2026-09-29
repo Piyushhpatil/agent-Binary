@@ -1,11 +1,12 @@
-"""`taintwalk eval` (Phase 8, D-032): score every rung, run the pre-registered tests, write RESULTS.md.
+"""`taintwalk eval` (Phase 8, D-032, D-034): score every rung, run the pre-registered tests, write RESULTS.md.
 
 Reads persisted files only; the walks happen elsewhere (`taintwalk walk --all`). Steps:
   1. --replay-check: replay each walk root offline into <out>/replay/<provider> (a separate root, so
      the live run's walk_all.json, logs and usage.json survive) and require byte-identical summaries.json;
   2. R1-R3 from program.json (eval/baselines.py), written to <out>/rules/;
   3. R4-R7 from the walk roots; every rung scored by score_rung() into <out>/scores/<rung>.json;
-  4. the pre-registered tests C1-C5 and, per provider, the ablation by stratum (eval/ablation.py);
+  4. the pre-registered tests and, per provider, the ablation by stratum (eval/ablation.py). Without a
+     cloud root the report is local-only (D-034): rungs R1-R5, family C2/C3L/C4L; with one, D-030's 10 tests;
   5. error analysis (eval/erroranalysis.py): parroting, the sanitizer-literal shortcut and abstentions for
      every LLM rung, and the hand-coding worksheet of the headline walk rung into <out>/errors/;
   6. cost from cache entries and runtime from the live walk_all.json (eval/cost.py);
@@ -26,7 +27,9 @@ from typing import Any
 from taintwalk.analysis.findings import FindingsError
 from taintwalk.config import REPO_ROOT
 from taintwalk.eval.ablation import (
+    COMPARISONS,
     LABELS,
+    LOCAL_COMPARISONS,
     AblationError,
     ablation,
     preregistered_tests,
@@ -49,10 +52,13 @@ from taintwalk.eval.score import _r, _table, _x, discover_runs
 from taintwalk.extract.report import load_manifest
 
 RUNGS = ("R1", "R2", "R3", "R4", "R5", "R6", "R7")
+LOCAL_RUNGS = RUNGS[:5]
 NAMES = {"R1": "flawfinder", "R2": "input rule", "R3": "reachability of an R1 hit",
          "R4": "per-function LLM, local", "R5": "TaintWalk, local",
          "R6": "per-function LLM, cloud", "R7": "TaintWalk, cloud (headline)"}
 PROVIDERS = (("local", "ollama", "R5", "R4"), ("cloud", "anthropic", "R7", "R6"))
+FAMILIES = {"cloud": ("D-030: C1-C5 on bad and good roots, 10 tests", COMPARISONS),
+            "local": ("D-034 local-only: C2, C3L, C4L on bad and good roots, 6 tests", LOCAL_COMPARISONS)}
 EXPECTED_ROOTS = 636
 DEFAULT_STATUS = "DRAFT: development run, not the Phase 8 gate (D-032)."
 DISCLOSED_BINARIES = ("tw-0015", "tw-0022", "tw-0065", "tw-0066", "tw-0091", "tw-0125", "tw-0135",
@@ -66,6 +72,15 @@ LIMITATIONS = (
     "`rand()` counts as an input source (Juliet's convention, the prompt's, and R2's list).",
     "CWE-78, 134 and 606 are effectively char-only: their wchar_t variants did not compile (D-013).",
     "Flow 44's function pointers resolve to call edges at -O0; an unresolved computed call would give no edge.",
+)
+LOCAL_ONLY_LIMITATION = ("Local 9B model only: the cloud headline (R7) is deferred pending API funding (D-034), "
+                         "so every LLM number here comes from ornith:9b.")
+FUTURE_WORK = (
+    "Cloud rungs R6/R7 on Claude Sonnet 5.5 are deferred until the API is funded (D-034). Everything they need is "
+    "built and tested offline: the D-031 configuration is in `config/providers.yaml`, and `taintwalk eval --cloud "
+    "ROOT` adds them.",
+    "Once funded: G-CLOUD pings, the label-free 40-function probe and its cost rule (D-031), the full cloud walk "
+    "with `--with-baseline`, then the full family of 10 pre-registered tests (D-030) and the provider comparison.",
 )
 
 
@@ -118,14 +133,14 @@ def _score_all(docs: dict[str, dict[str, Any]], *, labels_dir: Path, programs_di
     return scores
 
 
-def _problems(scores: dict[str, dict[str, Any]], *, full: bool) -> list[str]:
+def _problems(scores: dict[str, dict[str, Any]], *, full: bool, required: tuple[str, ...]) -> list[str]:
     out: list[str] = []
     keysets = {r: tuple(sorted((x["case_id"], x["addr"]) for x in s["roots"])) for r, s in scores.items()}
     if len(set(keysets.values())) > 1:
         out.append("rungs score different root sets")
     out += [f"{r}: {s['roots_not_walked']} roots not walked" for r, s in scores.items() if s["roots_not_walked"]]
     if full:
-        out += [f"{r} missing" for r in RUNGS if r not in scores]
+        out += [f"{r} missing" for r in required if r not in scores]
         out += [f"{r}: {len(s['roots'])} roots, expected {EXPECTED_ROOTS}"
                 for r, s in scores.items() if len(s["roots"]) != EXPECTED_ROOTS]
     return out
@@ -179,6 +194,8 @@ def run_eval(*, local_root: Path | None, cloud_root: Path | None, programs_dir: 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     roots = {n: Path(r) for n, r in (("local", local_root), ("cloud", cloud_root)) if r is not None}
+    mode = "cloud" if "cloud" in roots else "local"
+    family_name, family = FAMILIES[mode]
     problems: list[str] = []
     replay: dict[str, Any] = {}
     try:
@@ -192,8 +209,9 @@ def run_eval(*, local_root: Path | None, cloud_root: Path | None, programs_dir: 
                                         f"{r['identical']}/{r['programs']}")
         docs = _rung_docs(roots, Path(programs_dir), out_dir)
         scores = _score_all(docs, labels_dir=Path(labels_dir), programs_dir=Path(programs_dir), out_dir=out_dir)
-        problems += _problems(scores, full=full)
-        tests = preregistered_tests({r: s["roots"] for r, s in scores.items()})
+        problems += _problems(scores, full=full, required=RUNGS if mode == "cloud" else LOCAL_RUNGS)
+        tests = preregistered_tests({r: s["roots"] for r, s in scores.items()}, comparisons=family)
+        tests["family_name"] = family_name
         abl = _ablations(scores, roots)
         errors, sample = _error_measures(scores, roots, Path(programs_dir), out_dir)
         cost = {n: cost_report(root) for n, root in sorted(roots.items())}
@@ -204,6 +222,7 @@ def run_eval(*, local_root: Path | None, cloud_root: Path | None, programs_dir: 
         "rungs": {r: {"kind": s["kind"], "score_scale": s["score_scale"], "definition": s["definition"],
                       "identity": s["identity"], "roots": len(s["roots"]),
                       "primary": s["strata"]["pooled"]["primary"]} for r, s in scores.items()},
+        "cloud_deferred": mode == "local",
         "tests": tests, "ablation": abl, "errors": errors, "error_sample": sample, "cost": cost,
         "runtime": {n: _runtime(r) for n, r in sorted(roots.items())},
         "replay": replay, "problems": problems,
@@ -217,7 +236,7 @@ def run_eval(*, local_root: Path | None, cloud_root: Path | None, programs_dir: 
         md.parent.mkdir(parents=True, exist_ok=True)
         md.write_text(render_results(ev, scores, status=status, error_text=text), encoding="utf-8")
     print(f"rungs scored       : {' '.join(scores)}  roots per rung {sorted({len(s['roots']) for s in scores.values()})}")
-    print(f"pre-registered     : {len(tests['tests'])} of {tests['family']} tests, Holm applied: "
+    print(f"pre-registered     : {family_name}: {len(tests['tests'])} of {tests['family']} tests, Holm applied: "
           f"{'yes' if tests['holm_applied'] else 'no (missing ' + ', '.join(tests['missing']) + ')'}")
     for name, a in sorted(abl.items()):
         print(f"ablation {name:<9} : roots per stratum {a['counts']}")
@@ -250,11 +269,13 @@ def render_results(ev: dict[str, Any], scores: dict[str, dict[str, Any]], *, sta
                    error_text: str | None) -> str:
     present = [r for r in RUNGS if r in scores]
     pooled = {r: scores[r]["strata"]["pooled"] for r in present}
+    deferred = bool(ev.get("cloud_deferred"))
     lines: list[str] = [
         "# TaintWalk results (Phase 8)", "", f"> **Status:** {status}", "",
         f"- Rungs scored: {', '.join(present)}. Every rung is scored by the same D-008 code at the same "
         "path roots (I6).",
-        "- Rungs, tests, strata and codebook were fixed before any number existed: `docs/PREREGISTRATION.md`.",
+        "- Rungs, tests, strata and codebook were fixed before any number existed: `docs/PREREGISTRATION.md`"
+        + (" (with Deviation D-034: cloud rungs deferred pending funding)." if deferred else "."),
         "- Every cell with its 95% Wilson interval, and every root row: `scores/<rung>.json` beside `eval.json`.",
     ]
 
@@ -291,11 +312,11 @@ def render_results(ev: dict[str, Any], scores: dict[str, dict[str, Any]], *, sta
             [[r, conf(r).get("answered", "-"), _x(conf(r).get("auroc")), _x(conf(r).get("ece"))]
              for r in present if pooled[r]["confidence"]])
     tests = ev["tests"]
-    note = ("Holm-Bonferroni over the complete family of ten." if tests["holm_applied"] else
+    note = ("Holm-Bonferroni over the complete family." if tests["holm_applied"] else
             f"Holm correction not applied: the family is incomplete (missing {', '.join(tests['missing'])}); "
             "raw p values only.")
-    section("Pre-registered tests", "Exact McNemar on paired roots; right = TP on bad roots, TN on good roots; "
-            "an abstention is wrong. " + note,
+    section("Pre-registered tests", f"Family {tests.get('family_name', '')}. Exact McNemar on paired roots; right = TP "
+            "on bad roots, TN on good roots; an abstention is wrong. " + note,
             ["test", "A", "B", "n", "A right", "B right", "A only", "B only", "p", "p (Holm)", "reject"],
             [[k, t["a"], t["b"], t["n"], t["a_right"], t["b_right"], t["a_only"], t["b_only"], _x(t["p"]),
               _x(t.get("p_holm")), ("yes" if t["reject"] else "no") if "reject" in t else "-"]
@@ -318,6 +339,10 @@ def render_results(ev: dict[str, Any], scores: dict[str, dict[str, Any]], *, sta
     if "R5" in present and "R7" in present:
         pc_rows = [[r, NAMES[r], *(_r(pooled[r]["primary"][k]) for k in four)] for r in ("R5", "R7")]
         pc_intro = "The same walk on the local 9B model (R5) and the cloud headline model (R7); C5 tests the difference."
+    elif deferred:
+        pc_rows = []
+        pc_intro = ("Deferred pending API funding (D-034): the cloud rungs R6/R7 have not been run. "
+                    "See Future work.")
     else:
         pc_rows = []
         pc_intro = "Needs both R5 and R7; missing: " + ", ".join(r for r in ("R5", "R7") if r not in present) + "."
@@ -367,7 +392,11 @@ def render_results(ev: dict[str, Any], scores: dict[str, dict[str, Any]], *, sta
                   "Seen during development and kept in the corpus: " + ", ".join(DISCLOSED_BINARIES)
                   + " (the Phase 6 gate binary and the Phase 7 scorer shakedown), and the Phase 5 development and "
                   "held-out samples (20 functions each), which shaped prompt v2 and the local model choice."])
-    lines.extend(["", "## Limitations", "", *[f"- {x}" for x in LIMITATIONS]])
+    lines.extend(["", "## Future work", "",
+                  *([f"- {x}" for x in FUTURE_WORK] if deferred
+                    else ["- Phase 9: the same pipeline on real open-source binaries."])])
+    lines.extend(["", "## Limitations", "",
+                  *[f"- {x}" for x in ((LOCAL_ONLY_LIMITATION,) if deferred else ()) + LIMITATIONS]])
     return "\n".join(lines) + "\n"
 
 
@@ -385,7 +414,8 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     p.add_argument("--replay-check", action="store_true",
                    help="replay every walk offline into <out>/replay and require byte-identical summaries.json")
     p.add_argument("--jobs", type=int, default=4, help="parallel programs for the offline replay")
-    p.add_argument("--full", action="store_true", help="the Phase 8 gate: all seven rungs, 636 roots each")
+    p.add_argument("--full", action="store_true",
+                   help="the Phase 8 gate: every required rung on 636 roots (R1-R5 local-only, D-034; R1-R7 with --cloud)")
 
 
 def run_from_args(args: argparse.Namespace) -> int:
@@ -407,7 +437,7 @@ def run_from_args(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(prog="python -m taintwalk.eval.pipeline",
+    p = argparse.ArgumentParser(prog="taintwalk eval",
                                 description="Score every rung, run the pre-registered tests, write RESULTS.md.")
     add_arguments(p)
     return run_from_args(p.parse_args(argv))

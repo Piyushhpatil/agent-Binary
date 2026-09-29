@@ -1,4 +1,4 @@
-"""Paired comparisons for the pre-registered tests, and the ablation strata (Phase 8, D-030).
+"""Paired comparisons for the pre-registered tests, and the ablation strata (Phase 8, D-030, D-034).
 
 Every rung scores the same 636 roots, so two rungs are compared root by root (paired), never by
 overlapping intervals. For one comparison and one label, a root is right for a rung when its cell
@@ -6,9 +6,11 @@ is TP (bad root) or TN (good root); an abstention is wrong. Only the roots where
 disagree carry information: b = right for A only, c = right for B only. The exact McNemar test asks
 whether a split that uneven is plausible if each disagreement were a fair coin: b ~ Binomial(b+c, 1/2).
 
-The ten pre-registered tests (C1-C5, each on bad roots and on good roots) are corrected together with
-Holm-Bonferroni at family-wise alpha 0.05, and only when all ten exist; a partial family gets raw p
-values and no correction.
+Two pre-registered families, each corrected with Holm-Bonferroni at family-wise alpha 0.05, and only
+when the whole family exists:
+- COMPARISONS (D-030): C1-C5, each on bad and good roots, 10 tests; needs the cloud rungs R6 and R7.
+- LOCAL_COMPARISONS (D-034, fixed before any Phase 8 number): C2, C3L, C4L, 6 tests, for the local-only
+  report while the cloud rungs wait for funding.
 
 Ablation strata, per root: S0 the walk prompt had no callee block (context_chars == 0), so both arms
 sent the same bytes and must agree; S1 a callee block but a one-member path; S2 a path with more than
@@ -31,6 +33,7 @@ from taintwalk.eval.score import discover_runs
 ALPHA = 0.05
 COMPARISONS = (("C1", "R7", "R6"), ("C2", "R5", "R4"), ("C3", "R7", "R3"),
                ("C4", "R7", "R2"), ("C5", "R7", "R5"))
+LOCAL_COMPARISONS = (("C2", "R5", "R4"), ("C3L", "R5", "R3"), ("C4L", "R5", "R2"))
 LABELS = ("bad", "good")
 RIGHT = {"bad": "TP", "good": "TN"}
 Key = tuple[str, str]
@@ -103,12 +106,12 @@ def paired(a_roots: list[dict[str, Any]], b_roots: list[dict[str, Any]],
     return out
 
 
-def preregistered_tests(roots_by_rung: Mapping[str, list[dict[str, Any]]],
-                        alpha: float = ALPHA) -> dict[str, Any]:
-    """C1-C5 on bad and good roots. Holm runs only on the complete family of ten."""
+def preregistered_tests(roots_by_rung: Mapping[str, list[dict[str, Any]]], alpha: float = ALPHA,
+                        comparisons: tuple[tuple[str, str, str], ...] = COMPARISONS) -> dict[str, Any]:
+    """One pre-registered family on bad and good roots. Holm runs only when the whole family exists."""
     tests: dict[str, dict[str, Any]] = {}
     missing: list[str] = []
-    for cid, a, b in COMPARISONS:
+    for cid, a, b in comparisons:
         if a not in roots_by_rung or b not in roots_by_rung:
             missing.append(cid)
             continue
@@ -119,7 +122,7 @@ def preregistered_tests(roots_by_rung: Mapping[str, list[dict[str, Any]]],
     if applied:
         for name, v in holm({k: t["p"] for k, t in tests.items()}, alpha).items():
             tests[name].update(p_holm=v["p_holm"], reject=v["reject"])
-    return {"alpha": alpha, "family": 2 * len(COMPARISONS), "missing": missing,
+    return {"alpha": alpha, "family": 2 * len(comparisons), "missing": missing,
             "holm_applied": applied, "tests": tests}
 
 

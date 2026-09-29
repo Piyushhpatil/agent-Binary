@@ -1,10 +1,11 @@
-"""Paired comparisons, Holm, ablation strata and the prompt byte-identity audit (Phase 8, D-030)."""
+"""Paired comparisons, Holm, ablation strata and the prompt byte-identity audit (Phase 8, D-030, D-034)."""
 from __future__ import annotations
 
 import pytest
 
 from taintwalk.config import REPO_ROOT
 from taintwalk.eval.ablation import (
+    LOCAL_COMPARISONS,
     AblationError,
     ablation,
     audit_prompts,
@@ -98,6 +99,13 @@ def test_preregistered_family_is_ten_tests_and_holm_needs_all_of_them():
     part = preregistered_tests({k: v for k, v in rungs.items() if k != "R6"})
     assert part["missing"] == ["C1"] and not part["holm_applied"] and len(part["tests"]) == 8
     assert not any("p_holm" in t for t in part["tests"].values())
+
+
+def test_the_local_only_family_is_six_tests_with_holm():
+    roots = [_root("c1", "0x1", "bad", "TP"), _root("c1", "0x2", "good", "TN")]
+    out = preregistered_tests({r: roots for r in ("R2", "R3", "R4", "R5")}, comparisons=LOCAL_COMPARISONS)
+    assert out["family"] == 6 and out["holm_applied"] and len(out["tests"]) == 6
+    assert sorted({t["comparison"] for t in out["tests"].values()}) == ["C2", "C3L", "C4L"]
 
 
 def test_prompt_audit_on_the_phase6_gate_walk():
