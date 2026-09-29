@@ -119,3 +119,26 @@ Seen during development and kept in the corpus, named again in `docs/RESULTS.md`
 - tw-0015 (the Phase 6 gate binary) and twelve Phase 7 scorer-shakedown binaries: tw-0022, tw-0065, tw-0066,
   tw-0091, tw-0125, tw-0135, tw-0151, tw-0166, tw-0175, tw-0178, tw-0188, tw-0237;
 - the Phase 5 development and held-out samples (20 functions each), which shaped prompt v2 and the local model choice.
+## Deviation D-034 (2026-09-29, before any Phase 8 number existed)
+
+**Reason:** no funding for cloud API credits. Nothing here was chosen after seeing a result: no Phase 8 metric
+had been computed when this was written, and this file's git history is the timestamp.
+
+**What changes:**
+- Rungs R6 and R7 (Claude Sonnet 5.5) are deferred until the API is funded. Everything they need is built and
+  tested offline: the D-031 configuration is in `config/providers.yaml`, and `taintwalk eval --cloud ROOT` adds them.
+- Phase 8 reports R1-R5. The headline rung is R5 (TaintWalk on the local 9B model).
+- The pre-registered family for the local-only report, fixed now:
+
+| Test | Comparison | Question |
+|---|---|---|
+| C2 | R5 vs R4 | Does callee context help the local model? (the ablation) |
+| C3L | R5 vs R3 | Is the local walk more than graph reachability? |
+| C4L | R5 vs R2 | Does it beat "reads input => vulnerable"? |
+
+  Exact McNemar per label as before; Holm-Bonferroni over these 6 tests, family-wise alpha = 0.05. C1, C3, C4
+  and C5 (all involving R7) run as the full family of 10 once the cloud rungs exist.
+- The error-analysis sample (same seed, same codebook) is drawn from R5.
+
+**Future work (waiting for funding):** run R6/R7 on Claude Sonnet 5.5 (G-CLOUD, the 40-function probe and its
+cost rule, the full cloud walk), then report the full family of 10 tests and the provider comparison.
