@@ -142,3 +142,18 @@ had been computed when this was written, and this file's git history is the time
 
 **Future work (waiting for funding):** run R6/R7 on Claude Sonnet 5.5 (G-CLOUD, the 40-function probe and its
 cost rule, the full cloud walk), then report the full family of 10 tests and the provider comparison.
+
+## Deviation D-035 (2026-09-30, after RESULTS.md v1, while coding the error sample)
+
+**Reason:** the author asked for help coding the sampled errors.
+
+**What changes:**
+- The error sample (R5, seed 20260930, 20 false positives and 20 false negatives) and the codebook are unchanged.
+- The 40 errors were coded by an AI assistant (Claude) from the worksheet and reviewed by the author, instead of by
+  the author alone. No inter-rater agreement was measured.
+- Two tie-break rules were added while coding the first ten errors and applied to all 40:
+  1. context-induced: for a false positive, the model inherited a callee's vulnerable verdict, even when the root
+     passes a constant; for a false negative, a callee summary was wrong (a lost flow or sink, or a false guard) and
+     the model relied on it. "ignored constant argument" is used only when a constant reaches a sink in the root's
+     own code.
+  2. other: no category fits; the note names the pattern.

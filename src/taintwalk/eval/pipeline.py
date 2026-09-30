@@ -182,8 +182,10 @@ def _runtime(root: Path) -> dict[str, Any] | None:
     if not p.exists():
         return None
     d = json.loads(p.read_text(encoding="utf-8"))
-    return {k: d.get(k) for k in ("programs", "walk_ok", "calls", "cache_hits", "tokens_in", "tokens_out",
-                                  "model_s", "wall_s")}
+    out = {k: d.get(k) for k in ("programs", "walk_ok", "calls", "cache_hits", "tokens_in", "tokens_out",
+                                 "model_s", "wall_s")}
+    out["run_dirs"] = len(discover_runs(Path(root)))
+    return out
 
 
 def run_eval(*, local_root: Path | None, cloud_root: Path | None, programs_dir: Path, labels_dir: Path,
@@ -364,6 +366,9 @@ def render_results(ev: dict[str, Any], scores: dict[str, dict[str, Any]], *, sta
                               a["output_tokens"], "-" if a["usd"] is None else f"{a['usd']:.2f}"])
     rt = "; ".join(f"{n}: {r.get('programs')} programs, {r.get('calls')} calls ({r.get('cache_hits')} cache hits), "
                    f"model time {(r.get('model_s') or 0):.0f} s, wall {(r.get('wall_s') or 0):.0f} s"
+                   + (f" (the last resumed segment only: {r.get('programs')} of {r.get('run_dirs')} programs; "
+                      "earlier segments were interrupted and resumed from the cache)"
+                      if r.get("run_dirs") and r.get("programs") != r.get("run_dirs") else "")
                    for n, r in sorted(ev["runtime"].items()) if r) or "no live walk_all.json found"
     section("Cost and runtime", f"Tokens from cache entries (the original calls, deduplicated per arm); dollars at "
             f"{PRICES_AS_OF} list prices. Runtime from the live runs: {rt}.",
