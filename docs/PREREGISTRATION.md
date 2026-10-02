@@ -347,3 +347,45 @@ author-reviewed, disclosed exactly as D-035 requires.
   (no in-scope mechanism). Each is recorded in `census.json` with its rule.
 - The two seed examples read while choosing projects, CVE-2021-33797 (mujs) and CVE-2019-15133 (giflib),
   are disclosed here and are not exempt from any screen.
+
+## Deviation D-037 (2026-10-01, after the census ran, before any build or model call)
+
+**Reason:** the approved Stage 2 plan included "one CVE per function, the latest" (decision 4). The Phase 9
+text above left it out. The census then kept two pairs on the same function twice:
+
+| Project | Root function | CVEs |
+|---|---|---|
+| giflib | `DumpScreen2RGB` | CVE-2022-28506 (fixed 2024), CVE-2025-31344 (fixed 2026) |
+| md4c | `md_is_link_label` | CVE-2018-11545, CVE-2018-11547 (same day; git ancestry orders them) |
+
+For the earlier fix of each, the "patched" function still contains the later bug, so labelling it clean
+would be false. No binary had been built and no model had been called when this was written.
+
+**What changes:**
+
+1. **New screen S7: the patched root must be known-clean.** A pair is excluded when either holds:
+   - another census CVE, of any scope, has a fix commit that descends from this pair's fix commit and
+     changes the same root function. "Fix commit" uses the census's own four sources for every
+     project-matched CVE; "changes the same root function" uses the S2 mapping on that later commit. A
+     later commit that cannot be mapped (it does not build) excludes the pair as "S7 undecidable";
+   - an incomplete-fix follow-up names this CVE as the one it supersedes.
+
+   S7 is stronger than the approved rule on purpose: a later use-after-free fix in the same function
+   means its patched half was not clean either, although use-after-free is out of scope.
+2. **S7 runs after the seeded draw and frees no slot.** The committed draw stays exactly as it is, so
+   nothing about the candidate list is re-chosen.
+3. **S2, stated precisely.** A changed line inside a function counts toward that function. A changed line
+   outside every function is ignored only when it is blank or its stripped text begins with `//`, `/*`,
+   `*` or `*/`. Any other line outside a function (a macro, a struct field, a global, a preprocessor
+   line) fails S2, because it can change code outside the root.
+4. **Build hygiene.** Each version is compiled from the root of an exported tree with relative source
+   paths, in a directory with an opaque name. `__FILE__` then embeds only names such as `jsdtoa.c`, so no
+   CVE id can reach a binary through a path.
+
+**Clarification (no change):** "statically linked into the project's own command-line program" means the
+project's own sources are compiled into the executable instead of being loaded from a shared object.
+libc stays dynamic, exactly as in the Juliet corpus (PIE, D-014). `-static` would put libc into `.text`,
+and every library call would become an unnamed `FUN_`.
+
+**Known limit, stated now:** a negative is clean only with respect to the CVEs in the census. A later bug
+fixed silently, without a CVE, is invisible to S7.
