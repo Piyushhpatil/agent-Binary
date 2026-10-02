@@ -117,6 +117,7 @@ def _row_line(k: int, row: dict[str, Any]) -> str:
 
 def walk_program(provider: LLMProvider, prog: dict[str, Any], run_dir: Path, *, max_chars: int,
                  max_iterations: int, retry_failed: bool = False, with_baseline: bool = False,
+                 roots: tuple[str, ...] | None = None,
                  log: Callable[[str], None] = print) -> dict[str, Any]:
     if max_iterations < 1:
         raise ValueError("max_iterations must be at least 1")
@@ -126,7 +127,7 @@ def walk_program(provider: LLMProvider, prog: dict[str, Any], run_dir: Path, *, 
     sha = prog["binary"]["sha256"]
     fns = {f["addr"]: f for f in prog["functions"]}
     graph = build_graph(prog)
-    plan = plan_walk(graph)                       # verify_order runs inside; fails closed
+    plan = plan_walk(graph, roots)                       # verify_order runs inside; fails closed
 
     rows: dict[str, dict[str, Any]] = {}
     calls: list[dict[str, Any]] = []
@@ -175,7 +176,7 @@ def walk_program(provider: LLMProvider, prog: dict[str, Any], run_dir: Path, *, 
                 log(_row_line(len(calls), baseline[a]) + "  baseline")
 
     _write_json(run_dir / "summaries.json", {a: rows[a]["record"] for a in plan.functions})
-    _write_json(run_dir / "walk.json", {
+    walk_doc: dict[str, Any] = {
         "binary_sha256": sha,
         "prompt_version": PROMPT_VERSION,
         "callee_context_version": CALLEE_CONTEXT_VERSION,
@@ -190,7 +191,11 @@ def walk_program(provider: LLMProvider, prog: dict[str, Any], run_dir: Path, *, 
                           **rows[a]["walk"]} for a in plan.functions},
         "baseline": {a: {"status": r["status"], "failure": r.get("failure"), "cache_hit": r.get("cache_hit")}
                      for a, r in baseline.items()},
-    })
+    }
+    if plan.roots:                                # Phase 9 roots walk only; Juliet walk.json is unchanged
+        walk_doc["roots"] = list(plan.roots)
+        walk_doc["closure_size"] = len(plan.scope or ())
+    _write_json(run_dir / "walk.json", walk_doc)
     return {"run_dir": run_dir, "plan": plan, "rows": rows, "calls": calls,
             "components": components, "baseline": baseline}
 
@@ -221,6 +226,8 @@ def walk_report(result: dict[str, Any]) -> int:
 
     print(f"\nwalked             : {n}  skipped isolated {len(plan.skipped_isolated)}  "
           f"components {len(result['components'])} (recursive {len(rec)})")
+    if plan.roots:
+        print(f"roots              : {len(plan.roots)}  closure {len(plan.scope or ())} functions")
     print("walk order         : verified, every callee before its caller")
     print(f"summaries          : {ok}/{n} ok  entries {len(summaries)}/{n}  failures {dict(failures)}")
     print(f"callee context     : {with_ctx} functions with context, {omitted} callees omitted (budget)")

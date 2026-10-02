@@ -225,6 +225,7 @@ def _cmd_walk(args: argparse.Namespace) -> int:
     run dir and makes no model call. --all (Phase 8, D-032) walks every program in a list,
     one `taintwalk walk` subprocess and one run dir each."""
     import json
+    import re
 
     from taintwalk.config import REPO_ROOT, load_config
 
@@ -233,8 +234,9 @@ def _cmd_walk(args: argparse.Namespace) -> int:
         return p if p.is_absolute() else REPO_ROOT / p
 
     if args.all:
-        if args.program or args.explain:
-            print("--all walks the programs in --programs; drop --program and --explain", file=sys.stderr)
+        if args.program or args.explain or args.roots:
+            print("--all walks the programs in --programs; drop --program, --explain and --roots "
+                  "(per-program roots go after each path in the list file)", file=sys.stderr)
             return 2
         if not args.programs or not args.run_dir:
             print("--all needs --programs LIST|DIR and --run-dir ROOT", file=sys.stderr)
@@ -260,6 +262,14 @@ def _cmd_walk(args: argparse.Namespace) -> int:
     from taintwalk.llm.base import LLMError
     from taintwalk.llm.registry import get_provider, write_usage
 
+    roots = None
+    if args.roots:
+        roots = tuple(a.strip() for a in args.roots.split(",") if a.strip())
+        bad = [a for a in roots if not re.fullmatch(r"0x[0-9a-f]+", a)]
+        if not roots or bad:
+            print(f"--roots takes comma-separated addresses such as 0x1a2b; bad: {bad or args.roots!r}",
+                  file=sys.stderr)
+            return 2
     prog = json.loads(_abs(args.program).read_text(encoding="utf-8"))
     try:
         cfg_path = _abs(args.providers_config) if args.providers_config else None
@@ -278,10 +288,15 @@ def _cmd_walk(args: argparse.Namespace) -> int:
             max_iterations=wcfg["scc_max_iterations"],
             retry_failed=args.retry_failed,
             with_baseline=args.with_baseline,
+            roots=roots,
         )
     except LLMError as e:
         write_usage(run_dir, [provider])
         print(f"WALK FAIL: {type(e).__name__}: {e}")
+        return 1
+    except ValueError as e:                     # e.g. --roots naming a function that is not in scope
+        write_usage(run_dir, [provider])
+        print(f"WALK FAIL: {e}")
         return 1
     write_usage(run_dir, [provider])
     return walk_report(result)
@@ -424,6 +439,9 @@ def build_parser() -> argparse.ArgumentParser:
                     help="with --all: a text file of program.json paths, or a directory of them")
     wk.add_argument("--jobs", type=int, default=1,
                     help="with --all: programs walked at the same time (default 1)")
+    wk.add_argument("--roots", metavar="ADDRS",
+                    help="comma-separated addresses: walk only their downward closure, roots always "
+                         "included (Phase 9); with --all, roots go after each path in the list file")
     wk.set_defaults(func=_cmd_walk)
 
     sc = sub.add_parser("score", help="score walk run dirs against ground truth under D-008 (Phase 7)")

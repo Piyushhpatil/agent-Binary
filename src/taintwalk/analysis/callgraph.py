@@ -46,6 +46,8 @@ class Component:
 class WalkPlan:
     order: tuple[Component, ...]               # callees first
     skipped_isolated: tuple[str, ...]
+    scope: tuple[str, ...] | None = None       # Phase 9 roots walk: the roots' downward closure
+    roots: tuple[str, ...] = ()                # Phase 9 roots walk: walked even when isolated
 
     def position(self) -> dict[str, int]:
         return {a: i for i, c in enumerate(self.order) for a in c.members}
@@ -140,8 +142,13 @@ def verify_order(plan: WalkPlan, graph: CallGraph) -> None:
     scheduled no later than its caller (in the same component only when it is recursive)."""
     pos = plan.position()
     listed = list(pos) + list(plan.skipped_isolated)
-    if len(listed) != len(set(listed)) or set(listed) != set(graph.nodes):
-        raise ValueError("walk plan does not cover every in-scope function exactly once")
+    expected = set(graph.nodes) if plan.scope is None else set(plan.scope)
+    if len(listed) != len(set(listed)) or set(listed) != expected:
+        raise ValueError("walk plan does not cover every in-scope function exactly once"
+                         if plan.scope is None else "walk plan does not cover its roots' closure exactly once")
+    unwalked = [r for r in plan.roots if r not in pos]
+    if unwalked:
+        raise ValueError(f"walk plan skips roots {unwalked[:5]}")
     for u, pu in pos.items():
         for v in graph.succ[u]:
             if v not in pos:
@@ -152,13 +159,42 @@ def verify_order(plan: WalkPlan, graph: CallGraph) -> None:
                 raise ValueError(f"walk order: {u} and {v} share a non-recursive component")
 
 
-def plan_walk(graph: CallGraph) -> WalkPlan:
-    walk_nodes = tuple(a for a in graph.nodes if not graph.is_isolated(a))
-    skipped = tuple(a for a in graph.nodes if graph.is_isolated(a))
+def downward_closure(graph: CallGraph, roots: tuple[str, ...]) -> frozenset[str]:
+    """The roots plus every in-scope function reachable from them (Phase 9). Fails closed on a root
+    that is not an in-scope function."""
+    missing = [r for r in roots if r not in graph.succ]
+    if missing:
+        raise ValueError(f"roots are not in-scope functions: {missing[:5]}")
+    seen, stack = set(roots), list(roots)
+    while stack:
+        for c in graph.succ[stack.pop()]:
+            if c not in seen:
+                seen.add(c)
+                stack.append(c)
+    return frozenset(seen)
+
+
+def plan_walk(graph: CallGraph, roots: tuple[str, ...] | None = None) -> WalkPlan:
+    """The whole program (roots=None, Phases 6-8), or only the roots' downward closure (Phase 9).
+
+    A function's prompt depends only on its own code and its callees' summaries, and a downward
+    closure contains every callee of its members, so a roots walk gives each function in it exactly
+    the prompt a whole-program walk gives it. Roots are walked even when isolated: they are scored."""
+    if roots is None:
+        keep, forced = graph.nodes, frozenset()
+    else:
+        if not roots:
+            raise ValueError("roots must name at least one function")
+        scope = downward_closure(graph, roots)
+        keep, forced = tuple(a for a in graph.nodes if a in scope), frozenset(roots)
+    walk_nodes = tuple(a for a in keep if a in forced or not graph.is_isolated(a))
+    skipped = tuple(a for a in keep if a not in forced and graph.is_isolated(a))
     comps = tuple(
         Component(members=m, recursive=len(m) > 1 or m[0] in graph.succ[m[0]])
         for m in tarjan_sccs(walk_nodes, graph.succ)
     )
-    plan = WalkPlan(order=comps, skipped_isolated=skipped)
+    plan = WalkPlan(order=comps, skipped_isolated=skipped,
+                    scope=None if roots is None else keep,
+                    roots=() if roots is None else tuple(sorted(set(roots), key=addr_key)))
     verify_order(plan, graph)
     return plan

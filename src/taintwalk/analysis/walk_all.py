@@ -82,7 +82,7 @@ def read_program_list(src: Path) -> list[Path]:
             line = raw.strip()
             if not line or line.startswith("#"):
                 continue
-            p = Path(line)
+            p = Path(line.split()[0])              # an optional roots field may follow (Phase 9)
             progs.append(p if p.is_absolute() else REPO_ROOT / p)
     else:
         raise ValueError(f"program list not found: {src}")
@@ -97,13 +97,39 @@ def read_program_list(src: Path) -> list[Path]:
     return progs
 
 
+ROOT_ADDR = re.compile(r"^0x[0-9a-f]+$")
+
+
+def read_roots(src: Path) -> dict[str, tuple[str, ...]]:
+    """Per-program roots from a list file (Phase 9): a line may be "path addr,addr". Keyed by the
+    program file's stem, like the run dirs. A directory, or a line with a path only, has none."""
+    src = Path(src)
+    out: dict[str, tuple[str, ...]] = {}
+    if not src.is_file():
+        return out
+    for raw in src.read_text(encoding="utf-8").splitlines():
+        parts = raw.strip().split()
+        if not parts or parts[0].startswith("#"):
+            continue
+        if len(parts) > 2:
+            raise ValueError(f"a list line holds a path and at most one roots field: {raw.strip()!r}")
+        if len(parts) == 2:
+            roots = tuple(a for a in parts[1].split(",") if a)
+            if not roots or any(not ROOT_ADDR.match(a) for a in roots):
+                raise ValueError(f"bad roots field {parts[1]!r}; expected addresses such as 0x1a2b,0x1c3d")
+            out[Path(parts[0]).stem] = roots
+    return out
+
+
 def walk_command(program: Path, run_dir: Path, *, provider: str | None = None,
                  providers_config: Path | None = None, with_baseline: bool = False,
                  offline: bool = False, no_cache: bool = False,
-                 retry_failed: bool = False) -> list[str]:
+                 retry_failed: bool = False, roots: tuple[str, ...] | None = None) -> list[str]:
     """The single-program command, exactly as a person would type it."""
     cmd = [sys.executable, "-m", "taintwalk.cli", "walk",
            "--program", str(program), "--run-dir", str(run_dir)]
+    if roots:
+        cmd += ["--roots", ",".join(roots)]
     if provider:
         cmd += ["--provider", provider]
     if providers_config:
@@ -141,7 +167,8 @@ def run_subprocess(cmd: list[str], log: Path) -> int:
 
 
 def walk_all(programs: list[Path], root: Path, *, jobs: int = 1, runner: Runner | None = None,
-             progress: Callable[[str], None] = _say, **flags: Any) -> list[WalkResult]:
+             progress: Callable[[str], None] = _say, roots: dict[str, tuple[str, ...]] | None = None,
+             **flags: Any) -> list[WalkResult]:
     """Walk every program. Results come back in input order, whatever the completion order."""
     if jobs < 1:
         raise ValueError("jobs must be at least 1")
@@ -153,7 +180,7 @@ def walk_all(programs: list[Path], root: Path, *, jobs: int = 1, runner: Runner 
     def one(p: Path) -> WalkResult:
         log = root / LOG_DIR / f"{p.stem}.log"
         t0 = time.monotonic()
-        rc = run(walk_command(p, root / p.stem, **flags), log)
+        rc = run(walk_command(p, root / p.stem, roots=(roots or {}).get(p.stem), **flags), log)
         wall = time.monotonic() - t0
         info = parse_log(log.read_text(encoding="utf-8", errors="replace") if log.exists() else "")
         return WalkResult(program=str(p), name=p.stem, rc=rc,
@@ -211,6 +238,7 @@ def run_walk_all(programs_src: Path, root: Path, *, jobs: int = 1, runner: Runne
         return 2
     try:
         programs = read_program_list(programs_src)
+        roots = read_roots(programs_src)
     except ValueError as e:
         print(f"WALK ALL FAIL: {e}")
         return 1
@@ -223,7 +251,7 @@ def run_walk_all(programs_src: Path, root: Path, *, jobs: int = 1, runner: Runne
         mode = "live, disk cache on"
     _say(f"walk --all: {len(programs)} programs -> {root}  jobs {jobs}  {mode}")
     t0 = time.monotonic()
-    results = walk_all(programs, root, jobs=jobs, runner=runner, **flags)
+    results = walk_all(programs, root, jobs=jobs, runner=runner, roots=roots, **flags)
     wall = time.monotonic() - t0
     out = write_summary(root, results, jobs=jobs, flags=flags, wall_s=wall)
     t = _totals(results)
