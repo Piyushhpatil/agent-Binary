@@ -411,3 +411,23 @@ fixed silently, without a CVE, is invisible to S7.
    confirms it from `context_chars`. Pair outcomes are printed with these pairs set apart.
 5. **Not run: the typed ladder.** The Phase 9 statistics do not register it, and the real CWEs (787, 125,
    119, ...) lie outside the D-021 table. No mechanism labels are made.
+
+## Deviation D-039 (2026-10-02, after S6, before any model call): the Lua reserve is triggered
+
+**Reason:** S6 excluded two of the 11 pairs that passed S1-S5 and S7, leaving 9. Both hits were real names
+inside string literals of the root itself: jbig2dec's error messages name their own function
+(`jbig2_build_huffman_table`, CVE-2017-7975), and giflib's `DumpScreen2RGB` (CVE-2025-31344) prints the
+program name `gif2rgb`, which is also its source file's stem. The pre-registration adds Lua when fewer than 10
+pairs survive the screens.
+
+**What changes:**
+1. **Lua joins under the same rules:** project criteria, census (two-signal scope, four ordered resolution
+   sources, exclusions, cap 5, seed 20261001), screens S1-S7, and the D-037 and D-038 rules, all unchanged.
+2. **Lua is censused on its own.** The census draws with one random generator across projects in name order,
+   and `lua` sorts before `mujs`, so adding Lua to the same run would change the committed mujs draw. Lua gets
+   its own census (`runs/p9-census-lua/`), and the original census, re-run from its snapshots, must reproduce
+   byte for byte.
+3. **Lua's build recipe is validated on non-candidate trees first**, as for the other projects.
+4. **Lua's pairs and binaries are numbered after the existing ones**, so no committed pair or binary changes.
+5. **If the corpus is still below 10 pairs afterwards, it stays as it is** and the shortfall is disclosed. No
+   other project may be added.
