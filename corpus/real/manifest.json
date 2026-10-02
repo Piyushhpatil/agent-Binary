@@ -1,0 +1,1669 @@
+{
+ "entries": [
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-o",
+    "../bin.elf",
+    "jsarray.c",
+    "jsboolean.c",
+    "jsbuiltin.c",
+    "jscompile.c",
+    "jsdate.c",
+    "jsdtoa.c",
+    "jsdump.c",
+    "jserror.c",
+    "jsfunction.c",
+    "jsgc.c",
+    "jsintern.c",
+    "jslex.c",
+    "jsmath.c",
+    "jsnumber.c",
+    "jsobject.c",
+    "json.c",
+    "jsparse.c",
+    "jsproperty.c",
+    "jsregexp.c",
+    "jsrun.c",
+    "jsstate.c",
+    "jsstring.c",
+    "jsvalue.c",
+    "main.c",
+    "regexp.c",
+    "utf.c",
+    "utftype.c",
+    "-lm"
+   ],
+   "case_id": "rw-0001",
+   "commit": "f8234d830e17fc5e8fe09eb76d86dad3f6233c59",
+   "deny": [
+    "CVE-2016-7564"
+   ],
+   "elf": "runs/p9-screen/build/mujs-f8234d830e17/bin.elf",
+   "elf_sha256": "b77afca8759beb6ce4bd2e4004b0ea399ee1eb4ef8a9e09444b3bc135bb0f181",
+   "functions": [
+    {
+     "addr": 94140,
+     "addr_hex": "0x16fbc",
+     "cu": "jsfunction.c",
+     "label": "bad",
+     "name": "Fp_toString",
+     "pair": "rp-01",
+     "role": "root",
+     "size": 593
+    }
+   ],
+   "project": "mujs",
+   "source_files": [
+    "jsfunction.c"
+   ],
+   "stripped": "runs/p9-screen/build/mujs-f8234d830e17/bin.stripped.elf",
+   "stripped_sha256": "b195db01bf603972c084c71f3b0e72e7a0748613a72965e09f9994b6c6f27846",
+   "text": {
+    "addr": 18496,
+    "sha256": "c43ad71397bcf32ab8fd489d79affa7015b0263c7e95a3e2c9adfa17998863a4",
+    "size": 205789
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-o",
+    "../bin.elf",
+    "jsarray.c",
+    "jsboolean.c",
+    "jsbuiltin.c",
+    "jscompile.c",
+    "jsdate.c",
+    "jsdtoa.c",
+    "jsdump.c",
+    "jserror.c",
+    "jsfunction.c",
+    "jsgc.c",
+    "jsintern.c",
+    "jslex.c",
+    "jsmath.c",
+    "jsnumber.c",
+    "jsobject.c",
+    "json.c",
+    "jsparse.c",
+    "jsproperty.c",
+    "jsregexp.c",
+    "jsrun.c",
+    "jsstate.c",
+    "jsstring.c",
+    "jsvalue.c",
+    "main.c",
+    "regexp.c",
+    "utf.c",
+    "utftype.c",
+    "-lm"
+   ],
+   "case_id": "rw-0002",
+   "commit": "a3a4fe840b80706c706e86160352af5936f292d8",
+   "deny": [
+    "CVE-2016-7564"
+   ],
+   "elf": "runs/p9-screen/build/mujs-a3a4fe840b80/bin.elf",
+   "elf_sha256": "9bf4d70f72e9d5bbcadba64efef619e39250e131603d55dde152bfb9b5d76816",
+   "functions": [
+    {
+     "addr": 94140,
+     "addr_hex": "0x16fbc",
+     "cu": "jsfunction.c",
+     "label": "good",
+     "name": "Fp_toString",
+     "pair": "rp-01",
+     "role": "root",
+     "size": 596
+    }
+   ],
+   "project": "mujs",
+   "source_files": [
+    "jsfunction.c"
+   ],
+   "stripped": "runs/p9-screen/build/mujs-a3a4fe840b80/bin.stripped.elf",
+   "stripped_sha256": "e8f22b625f5b63b474ab662ed40cbbbbf3347a9fd0de8d2a889242ff669b8ce1",
+   "text": {
+    "addr": 18496,
+    "sha256": "3d9dc56f81494e5ffad73256b05fd2d5b05e927f13b20edede3480078625edcf",
+    "size": 205792
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-o",
+    "../bin.elf",
+    "jsarray.c",
+    "jsboolean.c",
+    "jsbuiltin.c",
+    "jscompile.c",
+    "jsdate.c",
+    "jsdtoa.c",
+    "jsdump.c",
+    "jserror.c",
+    "jsfunction.c",
+    "jsgc.c",
+    "jsintern.c",
+    "jslex.c",
+    "jsmath.c",
+    "jsnumber.c",
+    "jsobject.c",
+    "json.c",
+    "jsparse.c",
+    "jsproperty.c",
+    "jsregexp.c",
+    "jsrun.c",
+    "jsstate.c",
+    "jsstring.c",
+    "jsvalue.c",
+    "main.c",
+    "regexp.c",
+    "utf.c",
+    "utftype.c",
+    "-lm"
+   ],
+   "case_id": "rw-0003",
+   "commit": "8f62ea10a0af68e56d5c00720523ebcba13c2e6a",
+   "deny": [
+    "CVE-2017-5627",
+    "CVE-2017-5628"
+   ],
+   "elf": "runs/p9-screen/build/mujs-8f62ea10a0af/bin.elf",
+   "elf_sha256": "d7ebd3d151324c672ff963afebcd1695bf6d7b51da3f5e6c8526e96214fb7446",
+   "functions": [
+    {
+     "addr": 55590,
+     "addr_hex": "0xd926",
+     "cu": "jsdate.c",
+     "label": "good",
+     "name": "MakeDay",
+     "pair": "rp-03",
+     "role": "root",
+     "size": 302
+    },
+    {
+     "addr": 165249,
+     "addr_hex": "0x28581",
+     "cu": "jsrun.c",
+     "label": "bad",
+     "name": "jsR_setproperty",
+     "pair": "rp-02",
+     "role": "root",
+     "size": 991
+    }
+   ],
+   "project": "mujs",
+   "source_files": [
+    "jsdate.c",
+    "jsrun.c"
+   ],
+   "stripped": "runs/p9-screen/build/mujs-8f62ea10a0af/bin.stripped.elf",
+   "stripped_sha256": "56cebb6629913d95dbccaff6cd07f4f29e0680983d1f4e23630f642ef6a003c7",
+   "text": {
+    "addr": 18528,
+    "sha256": "5192f074ede802dd275ff62ce4168c1232ee281915778e7b3bb606d10c5422b6",
+    "size": 207250
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-o",
+    "../bin.elf",
+    "jsarray.c",
+    "jsboolean.c",
+    "jsbuiltin.c",
+    "jscompile.c",
+    "jsdate.c",
+    "jsdtoa.c",
+    "jsdump.c",
+    "jserror.c",
+    "jsfunction.c",
+    "jsgc.c",
+    "jsintern.c",
+    "jslex.c",
+    "jsmath.c",
+    "jsnumber.c",
+    "jsobject.c",
+    "json.c",
+    "jsparse.c",
+    "jsproperty.c",
+    "jsregexp.c",
+    "jsrun.c",
+    "jsstate.c",
+    "jsstring.c",
+    "jsvalue.c",
+    "main.c",
+    "regexp.c",
+    "utf.c",
+    "utftype.c",
+    "-lm"
+   ],
+   "case_id": "rw-0004",
+   "commit": "4006739a28367c708dea19aeb19b8a1a9326ce08",
+   "deny": [
+    "CVE-2017-5627"
+   ],
+   "elf": "runs/p9-screen/build/mujs-4006739a2836/bin.elf",
+   "elf_sha256": "2f7b56a906831ebc0021c6e67fa4679276880b5b07caf12b78a27f305d0823c5",
+   "functions": [
+    {
+     "addr": 165249,
+     "addr_hex": "0x28581",
+     "cu": "jsrun.c",
+     "label": "good",
+     "name": "jsR_setproperty",
+     "pair": "rp-02",
+     "role": "root",
+     "size": 1001
+    }
+   ],
+   "project": "mujs",
+   "source_files": [
+    "jsrun.c"
+   ],
+   "stripped": "runs/p9-screen/build/mujs-4006739a2836/bin.stripped.elf",
+   "stripped_sha256": "1db3138bf9ccfed3fae9b78f067e6fb4bd96ec96c8d1c2dd3479d844f354ebcf",
+   "text": {
+    "addr": 18528,
+    "sha256": "c1b084dfe10c8e40868a73832f03c48ea7dd9345b696d52fb43bdebcc69ab76b",
+    "size": 207260
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-o",
+    "../bin.elf",
+    "jsarray.c",
+    "jsboolean.c",
+    "jsbuiltin.c",
+    "jscompile.c",
+    "jsdate.c",
+    "jsdtoa.c",
+    "jsdump.c",
+    "jserror.c",
+    "jsfunction.c",
+    "jsgc.c",
+    "jsintern.c",
+    "jslex.c",
+    "jsmath.c",
+    "jsnumber.c",
+    "jsobject.c",
+    "json.c",
+    "jsparse.c",
+    "jsproperty.c",
+    "jsregexp.c",
+    "jsrun.c",
+    "jsstate.c",
+    "jsstring.c",
+    "jsvalue.c",
+    "main.c",
+    "regexp.c",
+    "utf.c",
+    "utftype.c",
+    "-lm"
+   ],
+   "case_id": "rw-0005",
+   "commit": "7e00def3c3c79534f1368a0b5bc0697b19683e60",
+   "deny": [
+    "CVE-2017-5628"
+   ],
+   "elf": "runs/p9-screen/build/mujs-7e00def3c3c7/bin.elf",
+   "elf_sha256": "ebca4a28aede5c0d13469a4b99f99eca5559b3fb7fd22f3cb29d1bd9a7d56fdd",
+   "functions": [
+    {
+     "addr": 55590,
+     "addr_hex": "0xd926",
+     "cu": "jsdate.c",
+     "label": "bad",
+     "name": "MakeDay",
+     "pair": "rp-03",
+     "role": "root",
+     "size": 271
+    }
+   ],
+   "project": "mujs",
+   "source_files": [
+    "jsdate.c"
+   ],
+   "stripped": "runs/p9-screen/build/mujs-7e00def3c3c7/bin.stripped.elf",
+   "stripped_sha256": "30d5afb997e1abe526fe64f992c7269483a40d6b8161d01b0edd5f28d0751cd9",
+   "text": {
+    "addr": 18528,
+    "sha256": "9bdc10ad188c09cd5b3cacba68c89d030eb687d1eea81ab5088f8b00efb29b46",
+    "size": 207219
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-o",
+    "../bin.elf",
+    "jsarray.c",
+    "jsboolean.c",
+    "jsbuiltin.c",
+    "jscompile.c",
+    "jsdate.c",
+    "jsdtoa.c",
+    "jsdump.c",
+    "jserror.c",
+    "jsfunction.c",
+    "jsgc.c",
+    "jsintern.c",
+    "jslex.c",
+    "jsmath.c",
+    "jsnumber.c",
+    "jsobject.c",
+    "json.c",
+    "jsparse.c",
+    "jsproperty.c",
+    "jsregexp.c",
+    "jsrepr.c",
+    "jsrun.c",
+    "jsstate.c",
+    "jsstring.c",
+    "jsvalue.c",
+    "main.c",
+    "regexp.c",
+    "utf.c",
+    "utftype.c",
+    "-lm"
+   ],
+   "case_id": "rw-0006",
+   "commit": "292415b62547c0bec95ee63d836cb536c1ee9c84",
+   "deny": [
+    "CVE-2021-33797"
+   ],
+   "elf": "runs/p9-screen/build/mujs-292415b62547/bin.elf",
+   "elf_sha256": "5e8b42f1825e66c3359786955c4b650f6955ff5b31f14aae4ea21eb60333f0a8",
+   "functions": [
+    {
+     "addr": 73328,
+     "addr_hex": "0x11e70",
+     "cu": "jsdtoa.c",
+     "label": "bad",
+     "name": "js_strtod",
+     "pair": "rp-04",
+     "role": "root",
+     "size": 853
+    }
+   ],
+   "project": "mujs",
+   "source_files": [
+    "jsdtoa.c"
+   ],
+   "stripped": "runs/p9-screen/build/mujs-292415b62547/bin.stripped.elf",
+   "stripped_sha256": "010f34a6fad54ef5824f759a3b351a9146d9bcc528e396933273c343451120e2",
+   "text": {
+    "addr": 18368,
+    "sha256": "1979d877d6a545bd371c432c1ca1767143ff4b7c84b14da133ccdac76b3fe1cc",
+    "size": 225128
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-o",
+    "../bin.elf",
+    "jsarray.c",
+    "jsboolean.c",
+    "jsbuiltin.c",
+    "jscompile.c",
+    "jsdate.c",
+    "jsdtoa.c",
+    "jsdump.c",
+    "jserror.c",
+    "jsfunction.c",
+    "jsgc.c",
+    "jsintern.c",
+    "jslex.c",
+    "jsmath.c",
+    "jsnumber.c",
+    "jsobject.c",
+    "json.c",
+    "jsparse.c",
+    "jsproperty.c",
+    "jsregexp.c",
+    "jsrepr.c",
+    "jsrun.c",
+    "jsstate.c",
+    "jsstring.c",
+    "jsvalue.c",
+    "main.c",
+    "regexp.c",
+    "utf.c",
+    "utftype.c",
+    "-lm"
+   ],
+   "case_id": "rw-0007",
+   "commit": "833b6f1672b4f2991a63c4d05318f0b84ef4d550",
+   "deny": [
+    "CVE-2021-33797"
+   ],
+   "elf": "runs/p9-screen/build/mujs-833b6f1672b4/bin.elf",
+   "elf_sha256": "76a02dfc4995ebb87bd051870643531c12cb447ac5517a2e85e8bf67a6f44a2b",
+   "functions": [
+    {
+     "addr": 73328,
+     "addr_hex": "0x11e70",
+     "cu": "jsdtoa.c",
+     "label": "good",
+     "name": "js_strtod",
+     "pair": "rp-04",
+     "role": "root",
+     "size": 882
+    }
+   ],
+   "project": "mujs",
+   "source_files": [
+    "jsdtoa.c"
+   ],
+   "stripped": "runs/p9-screen/build/mujs-833b6f1672b4/bin.stripped.elf",
+   "stripped_sha256": "0ab48313ef1156980ffb604a7781d6aaac786419e164fcb8c42d58f41debdd7b",
+   "text": {
+    "addr": 18368,
+    "sha256": "a5913bc4c4ca200bc6e6327decfc726ee232e8d73218c82232e182ed0e433271",
+    "size": 225157
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-Imd4c",
+    "-Imd2html",
+    "-o",
+    "../bin.elf",
+    "md2html/cmdline.c",
+    "md2html/entity.c",
+    "md2html/md2html.c",
+    "md2html/render_html.c",
+    "md4c/md4c.c"
+   ],
+   "case_id": "rw-0008",
+   "commit": "e7b84d65a42048f812a006e88ca1b353d7828974",
+   "deny": [
+    "CVE-2018-11536"
+   ],
+   "elf": "runs/p9-screen/build/md4c-e7b84d65a420/bin.elf",
+   "elf_sha256": "3f708907f2ab5215be06fba4d85410afd97cc61c5a0221a73604e0188e8c95f3",
+   "functions": [
+    {
+     "addr": 104849,
+     "addr_hex": "0x19991",
+     "cu": "md4c.c",
+     "label": "bad",
+     "name": "md_split_simple_pairing_mark",
+     "pair": "rp-05",
+     "role": "root",
+     "size": 213
+    }
+   ],
+   "project": "md4c",
+   "source_files": [
+    "md4c.c"
+   ],
+   "stripped": "runs/p9-screen/build/md4c-e7b84d65a420/bin.stripped.elf",
+   "stripped_sha256": "128e6942a5be1fa37bfebe1d84733307fedca4233dfce442acd84f93c3b64f46",
+   "text": {
+    "addr": 62368,
+    "sha256": "e6080a349bf923384fe151f204815d470c9a7ebe4148f08f78545615d8c9612e",
+    "size": 72395
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-Imd4c",
+    "-Imd2html",
+    "-o",
+    "../bin.elf",
+    "md2html/cmdline.c",
+    "md2html/entity.c",
+    "md2html/md2html.c",
+    "md2html/render_html.c",
+    "md4c/md4c.c"
+   ],
+   "case_id": "rw-0009",
+   "commit": "bf022cb6569457598fb37b266a4129d1aa01211b",
+   "deny": [
+    "CVE-2018-11536"
+   ],
+   "elf": "runs/p9-screen/build/md4c-bf022cb65694/bin.elf",
+   "elf_sha256": "0ba00e23be945c4a4ec6ff5ef34737678f2a54ed623c702aeeabdf80ec3f448d",
+   "functions": [
+    {
+     "addr": 104849,
+     "addr_hex": "0x19991",
+     "cu": "md4c.c",
+     "label": "good",
+     "name": "md_split_simple_pairing_mark",
+     "pair": "rp-05",
+     "role": "root",
+     "size": 213
+    }
+   ],
+   "project": "md4c",
+   "source_files": [
+    "md4c.c"
+   ],
+   "stripped": "runs/p9-screen/build/md4c-bf022cb65694/bin.stripped.elf",
+   "stripped_sha256": "312f2509d6ca09108ce2c06c2a77c1c64131f7f7e7a75de460e83bab26a7af5c",
+   "text": {
+    "addr": 62368,
+    "sha256": "db5fc7a2cb7375182158acc47dd99c88e0d46cd0097b7645887c330f9359c74b",
+    "size": 72395
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-Imd4c",
+    "-Imd2html",
+    "-o",
+    "../bin.elf",
+    "md2html/cmdline.c",
+    "md2html/entity.c",
+    "md2html/md2html.c",
+    "md2html/render_html.c",
+    "md4c/md4c.c"
+   ],
+   "case_id": "rw-0010",
+   "commit": "469873ee6ce96ef475baa9993f56aa1893456ae0",
+   "deny": [
+    "CVE-2018-11546",
+    "CVE-2018-11547"
+   ],
+   "elf": "runs/p9-screen/build/md4c-469873ee6ce9/bin.elf",
+   "elf_sha256": "d9178ac4544f2be56a9cd4227d84b4999e3d7525f0acd48be3951a06f4e264ea",
+   "functions": [
+    {
+     "addr": 80640,
+     "addr_hex": "0x13b00",
+     "cu": "md4c.c",
+     "label": "bad",
+     "name": "md_is_named_entity_contents",
+     "pair": "rp-06",
+     "role": "root",
+     "size": 294
+    },
+    {
+     "addr": 86322,
+     "addr_hex": "0x15132",
+     "cu": "md4c.c",
+     "label": "good",
+     "name": "md_is_link_label",
+     "pair": "rp-07",
+     "role": "root",
+     "size": 831
+    }
+   ],
+   "project": "md4c",
+   "source_files": [
+    "md4c.c"
+   ],
+   "stripped": "runs/p9-screen/build/md4c-469873ee6ce9/bin.stripped.elf",
+   "stripped_sha256": "bf44d8720b0aad6f9dcbafca41950dc651d8837ee859042d873709ed65623ce0",
+   "text": {
+    "addr": 62368,
+    "sha256": "44ebc9ab90e87742aca52e705853cd4be1ed30b8b9fbb9a9eaa8a7366ea39412",
+    "size": 72401
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-Imd4c",
+    "-Imd2html",
+    "-o",
+    "../bin.elf",
+    "md2html/cmdline.c",
+    "md2html/entity.c",
+    "md2html/md2html.c",
+    "md2html/render_html.c",
+    "md4c/md4c.c"
+   ],
+   "case_id": "rw-0011",
+   "commit": "e5feaf2c96a08390f89a72972b5f8b808ca34e79",
+   "deny": [
+    "CVE-2018-11546"
+   ],
+   "elf": "runs/p9-screen/build/md4c-e5feaf2c96a0/bin.elf",
+   "elf_sha256": "5edf62d6afc6e76150d13173c9099d90cef82cc1e2fcf3d7f3faf03cddbbb57d",
+   "functions": [
+    {
+     "addr": 80640,
+     "addr_hex": "0x13b00",
+     "cu": "md4c.c",
+     "label": "good",
+     "name": "md_is_named_entity_contents",
+     "pair": "rp-06",
+     "role": "root",
+     "size": 294
+    }
+   ],
+   "project": "md4c",
+   "source_files": [
+    "md4c.c"
+   ],
+   "stripped": "runs/p9-screen/build/md4c-e5feaf2c96a0/bin.stripped.elf",
+   "stripped_sha256": "dbe3b6ca6770f5f5dd0252d2ecf50c2a5f76844bf4a10d7f105acb631b9321f0",
+   "text": {
+    "addr": 62368,
+    "sha256": "4f19209183720cdea6b8b095347afcc909c423af0ebf15b3b1ead43d3aa4de9a",
+    "size": 72401
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-Imd4c",
+    "-Imd2html",
+    "-o",
+    "../bin.elf",
+    "md2html/cmdline.c",
+    "md2html/entity.c",
+    "md2html/md2html.c",
+    "md2html/render_html.c",
+    "md4c/md4c.c"
+   ],
+   "case_id": "rw-0012",
+   "commit": "7deaccf65d01d5bde104efb3b6fd18aab8ae8392",
+   "deny": [
+    "CVE-2018-11547"
+   ],
+   "elf": "runs/p9-screen/build/md4c-7deaccf65d01/bin.elf",
+   "elf_sha256": "1cda0d2cba1af8556f0af2a505747588365cfd9c9e2d663ada5935ae592ee3a8",
+   "functions": [
+    {
+     "addr": 86322,
+     "addr_hex": "0x15132",
+     "cu": "md4c.c",
+     "label": "bad",
+     "name": "md_is_link_label",
+     "pair": "rp-07",
+     "role": "root",
+     "size": 834
+    }
+   ],
+   "project": "md4c",
+   "source_files": [
+    "md4c.c"
+   ],
+   "stripped": "runs/p9-screen/build/md4c-7deaccf65d01/bin.stripped.elf",
+   "stripped_sha256": "d94bdb0ab59ceb8ce986fe8961d7de3f0c5d9049653ce6ee23f4ea9283f35466",
+   "text": {
+    "addr": 62368,
+    "sha256": "02c7a8e93acae0f0911ecbcf6a0c6071faf650c6e859f201e33b268a5c8fedfc",
+    "size": 72404
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-Ilib",
+    "-Iutil",
+    "-o",
+    "../bin.elf",
+    "lib/dgif_lib.c",
+    "lib/egif_lib.c",
+    "lib/gif_err.c",
+    "lib/gif_font.c",
+    "lib/gif_hash.c",
+    "lib/gifalloc.c",
+    "lib/openbsd-reallocarray.c",
+    "lib/quantize.c",
+    "util/getarg.c",
+    "util/gif2rgb.c",
+    "util/qprintf.c",
+    "-lm"
+   ],
+   "case_id": "rw-0013",
+   "commit": "7b241f4398a6063df48844e65a0f65b0c7c498b1",
+   "deny": [
+    "CVE-2018-11490"
+   ],
+   "elf": "runs/p9-screen/build/giflib-7b241f4398a6/bin.elf",
+   "elf_sha256": "fa6e7af30b6627e20d9c22c5aa6b00f66ac5ec5962f97552cc1336008ca3a51e",
+   "functions": [
+    {
+     "addr": 12465,
+     "addr_hex": "0x30b1",
+     "cu": "dgif_lib.c",
+     "label": "bad",
+     "name": "DGifDecompressLine",
+     "pair": "rp-08",
+     "role": "root",
+     "size": 1154
+    }
+   ],
+   "project": "giflib",
+   "source_files": [
+    "dgif_lib.c"
+   ],
+   "stripped": "runs/p9-screen/build/giflib-7b241f4398a6/bin.stripped.elf",
+   "stripped_sha256": "0524810724905e5a02e3d6e8a90cd4558fd130b39e5a2459a559e615cbab6183",
+   "text": {
+    "addr": 5088,
+    "sha256": "3b2c02c28d4f75af1ca79b622374c347b1391528daa5cd7896fb1cce806143d8",
+    "size": 42520
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-Ilib",
+    "-Iutil",
+    "-o",
+    "../bin.elf",
+    "lib/dgif_lib.c",
+    "lib/egif_lib.c",
+    "lib/gif_err.c",
+    "lib/gif_font.c",
+    "lib/gif_hash.c",
+    "lib/gifalloc.c",
+    "lib/openbsd-reallocarray.c",
+    "lib/quantize.c",
+    "util/getarg.c",
+    "util/gif2rgb.c",
+    "util/qprintf.c",
+    "-lm"
+   ],
+   "case_id": "rw-0014",
+   "commit": "08438a5098f3bb1de23a29334af55eba663f75bd",
+   "deny": [
+    "CVE-2018-11490"
+   ],
+   "elf": "runs/p9-screen/build/giflib-08438a5098f3/bin.elf",
+   "elf_sha256": "835c02a048bbd96809c93cbac3b10eeb4410b23245b88f4ea36f3e39d88ff909",
+   "functions": [
+    {
+     "addr": 12465,
+     "addr_hex": "0x30b1",
+     "cu": "dgif_lib.c",
+     "label": "good",
+     "name": "DGifDecompressLine",
+     "pair": "rp-08",
+     "role": "root",
+     "size": 1172
+    }
+   ],
+   "project": "giflib",
+   "source_files": [
+    "dgif_lib.c"
+   ],
+   "stripped": "runs/p9-screen/build/giflib-08438a5098f3/bin.stripped.elf",
+   "stripped_sha256": "79ac44c2316290044b56d446f83f8954792ed99bf4b9f0a2162c8f41e16812e8",
+   "text": {
+    "addr": 5088,
+    "sha256": "f5e8dca175659cc469423fa46be4ef61418bd7b374ec73459ea0b54e916a4b06",
+    "size": 42538
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-I.",
+    "-o",
+    "../bin.elf",
+    "dgif_lib.c",
+    "egif_lib.c",
+    "getarg.c",
+    "gif2rgb.c",
+    "gif_err.c",
+    "gif_font.c",
+    "gif_hash.c",
+    "gifalloc.c",
+    "openbsd-reallocarray.c",
+    "qprintf.c",
+    "quantize.c",
+    "-lm"
+   ],
+   "case_id": "rw-0015",
+   "commit": "c5e0a61f56022eb2315e211ede9ccd36c6779d88",
+   "deny": [
+    "CVE-2025-31344"
+   ],
+   "elf": "runs/p9-screen/build/giflib-c5e0a61f5602/bin.elf",
+   "elf_sha256": "2a085048fd2ebf68aacbe5f9131ca6960ab818a36e077fb61de97875ec35ce9b",
+   "functions": [
+    {
+     "addr": 32636,
+     "addr_hex": "0x7f7c",
+     "cu": "gif2rgb.c",
+     "label": "bad",
+     "name": "DumpScreen2RGB",
+     "pair": "rp-09",
+     "role": "root",
+     "size": 1858
+    }
+   ],
+   "project": "giflib",
+   "source_files": [
+    "gif2rgb.c"
+   ],
+   "stripped": "runs/p9-screen/build/giflib-c5e0a61f5602/bin.stripped.elf",
+   "stripped_sha256": "7d9f66e7a229e90e98dd235aa6a3763eece6b0f78c3bf0cf7c851f3aeeb09b07",
+   "text": {
+    "addr": 5088,
+    "sha256": "cc81f80c388086d72eb50572c6be68a4f4a4c187bd832411b86d3afeecd9ee2b",
+    "size": 41784
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-I.",
+    "-o",
+    "../bin.elf",
+    "dgif_lib.c",
+    "egif_lib.c",
+    "getarg.c",
+    "gif2rgb.c",
+    "gif_err.c",
+    "gif_font.c",
+    "gif_hash.c",
+    "gifalloc.c",
+    "openbsd-reallocarray.c",
+    "qprintf.c",
+    "quantize.c",
+    "-lm"
+   ],
+   "case_id": "rw-0016",
+   "commit": "7bbe8ea1a595bb7509ffa0a86b076e9b720e85af",
+   "deny": [
+    "CVE-2025-31344"
+   ],
+   "elf": "runs/p9-screen/build/giflib-7bbe8ea1a595/bin.elf",
+   "elf_sha256": "bb9a3be50c78eb1759364aa46e78b5f1d21dac0280d29de25d731373555e8c1f",
+   "functions": [
+    {
+     "addr": 32636,
+     "addr_hex": "0x7f7c",
+     "cu": "gif2rgb.c",
+     "label": "good",
+     "name": "DumpScreen2RGB",
+     "pair": "rp-09",
+     "role": "root",
+     "size": 1953
+    }
+   ],
+   "project": "giflib",
+   "source_files": [
+    "gif2rgb.c"
+   ],
+   "stripped": "runs/p9-screen/build/giflib-7bbe8ea1a595/bin.stripped.elf",
+   "stripped_sha256": "681de090dfc66e5856fef93c7ae431a7591e7611dd993de6c5651235c4b3f82e",
+   "text": {
+    "addr": 5088,
+    "sha256": "df9cb86dbeaa1ce3a1aee4e274089b3d3b2a975d1d28e72663c3dd98a80be1b8",
+    "size": 41879
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-I.",
+    "-o",
+    "../bin.elf",
+    "dgif_lib.c",
+    "egif_lib.c",
+    "getarg.c",
+    "gif2rgb.c",
+    "gif_err.c",
+    "gif_font.c",
+    "gif_hash.c",
+    "gifalloc.c",
+    "openbsd-reallocarray.c",
+    "qprintf.c",
+    "quantize.c",
+    "-lm"
+   ],
+   "case_id": "rw-0017",
+   "commit": "edff4aed17f857442ab0cac31566572ba08f93d3",
+   "deny": [
+    "CVE-2026-26740"
+   ],
+   "elf": "runs/p9-screen/build/giflib-edff4aed17f8/bin.elf",
+   "elf_sha256": "71c9f348d126fbcd708844c143a656cd8afac602c6093643a7caa721bb0fb2ae",
+   "functions": [
+    {
+     "addr": 19549,
+     "addr_hex": "0x4c5d",
+     "cu": "egif_lib.c",
+     "label": "bad",
+     "name": "EGifGCBToSavedExtension",
+     "pair": "rp-10",
+     "role": "root",
+     "size": 343
+    }
+   ],
+   "project": "giflib",
+   "source_files": [
+    "egif_lib.c"
+   ],
+   "stripped": "runs/p9-screen/build/giflib-edff4aed17f8/bin.stripped.elf",
+   "stripped_sha256": "47b1460bd3c44102e5e3617af3ae087ddfae9d4e1e380e72337e2c5fc6505729",
+   "text": {
+    "addr": 5088,
+    "sha256": "d9557fecc878bc60be59fa0ea7d72ea89112356bd3350695ae66e5d529a5c04c",
+    "size": 44112
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-I.",
+    "-o",
+    "../bin.elf",
+    "dgif_lib.c",
+    "egif_lib.c",
+    "getarg.c",
+    "gif2rgb.c",
+    "gif_err.c",
+    "gif_font.c",
+    "gif_hash.c",
+    "gifalloc.c",
+    "openbsd-reallocarray.c",
+    "qprintf.c",
+    "quantize.c",
+    "-lm"
+   ],
+   "case_id": "rw-0018",
+   "commit": "061605081115bbfd7019bafc119a13b6f17fcf25",
+   "deny": [
+    "CVE-2026-26740"
+   ],
+   "elf": "runs/p9-screen/build/giflib-061605081115/bin.elf",
+   "elf_sha256": "5dfa99506b9f2f5e9ea7bde3b146cf908a52e8a485be7290985d35dacc5d0593",
+   "functions": [
+    {
+     "addr": 19549,
+     "addr_hex": "0x4c5d",
+     "cu": "egif_lib.c",
+     "label": "good",
+     "name": "EGifGCBToSavedExtension",
+     "pair": "rp-10",
+     "role": "root",
+     "size": 364
+    }
+   ],
+   "project": "giflib",
+   "source_files": [
+    "egif_lib.c"
+   ],
+   "stripped": "runs/p9-screen/build/giflib-061605081115/bin.stripped.elf",
+   "stripped_sha256": "bd2aca98601353c0653596b620deb0d55a9d9549744a99c600aa18d4f1a10b26",
+   "text": {
+    "addr": 5088,
+    "sha256": "a5530bbeca11e413d671295595b4a3defb62c3cbc813e224d9df86c93074fbfd",
+    "size": 44133
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-DHAVE_STDINT_H",
+    "-o",
+    "../bin.elf",
+    "jbig2.c",
+    "jbig2_arith.c",
+    "jbig2_arith_iaid.c",
+    "jbig2_arith_int.c",
+    "jbig2_generic.c",
+    "jbig2_halftone.c",
+    "jbig2_huffman.c",
+    "jbig2_image.c",
+    "jbig2_image_pbm.c",
+    "jbig2_metadata.c",
+    "jbig2_mmr.c",
+    "jbig2_page.c",
+    "jbig2_refinement.c",
+    "jbig2_segment.c",
+    "jbig2_symbol_dict.c",
+    "jbig2_text.c",
+    "jbig2dec.c",
+    "memento.c",
+    "sha1.c",
+    "-lm"
+   ],
+   "case_id": "rw-0019",
+   "commit": "2b69772201628cfc44af64e35f900e2efd4b66e7",
+   "deny": [
+    "CVE-2017-7975"
+   ],
+   "elf": "runs/p9-screen/build/jbig2dec-2b6977220162/bin.elf",
+   "elf_sha256": "2fa69d92a496e82a8bab4e90f67e17ab4f3630362cf1377a98839b8f0b57ed19",
+   "functions": [
+    {
+     "addr": 34912,
+     "addr_hex": "0x8860",
+     "cu": "jbig2_huffman.c",
+     "label": "bad",
+     "name": "jbig2_build_huffman_table",
+     "pair": "rp-11",
+     "role": "root",
+     "size": 1679
+    }
+   ],
+   "project": "jbig2dec",
+   "source_files": [
+    "jbig2_huffman.c"
+   ],
+   "stripped": "runs/p9-screen/build/jbig2dec-2b6977220162/bin.stripped.elf",
+   "stripped_sha256": "cc24ca284385c7ad91fc51605c376a5f7570ae117bf392452e7f424e537e91bb",
+   "text": {
+    "addr": 9280,
+    "sha256": "2b8527f4bb17527420c78503096cc5af114558be3bf473c1bd33ff74444b880e",
+    "size": 90325
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-DHAVE_STDINT_H",
+    "-o",
+    "../bin.elf",
+    "jbig2.c",
+    "jbig2_arith.c",
+    "jbig2_arith_iaid.c",
+    "jbig2_arith_int.c",
+    "jbig2_generic.c",
+    "jbig2_halftone.c",
+    "jbig2_huffman.c",
+    "jbig2_image.c",
+    "jbig2_image_pbm.c",
+    "jbig2_metadata.c",
+    "jbig2_mmr.c",
+    "jbig2_page.c",
+    "jbig2_refinement.c",
+    "jbig2_segment.c",
+    "jbig2_symbol_dict.c",
+    "jbig2_text.c",
+    "jbig2dec.c",
+    "memento.c",
+    "sha1.c",
+    "-lm"
+   ],
+   "case_id": "rw-0020",
+   "commit": "f8992b8fe65c170c8624226f127c5c4bfed42c66",
+   "deny": [
+    "CVE-2017-7975"
+   ],
+   "elf": "runs/p9-screen/build/jbig2dec-f8992b8fe65c/bin.elf",
+   "elf_sha256": "9a6a534fd81bb3cd61694d683b56db02efa73e6a5a250752e7792abb8370bbcc",
+   "functions": [
+    {
+     "addr": 34912,
+     "addr_hex": "0x8860",
+     "cu": "jbig2_huffman.c",
+     "label": "good",
+     "name": "jbig2_build_huffman_table",
+     "pair": "rp-11",
+     "role": "root",
+     "size": 1679
+    }
+   ],
+   "project": "jbig2dec",
+   "source_files": [
+    "jbig2_huffman.c"
+   ],
+   "stripped": "runs/p9-screen/build/jbig2dec-f8992b8fe65c/bin.stripped.elf",
+   "stripped_sha256": "bee6c6dc6573d51c800cc1a5006ffd124e857f19183c3b2e5750010a0168a002",
+   "text": {
+    "addr": 9280,
+    "sha256": "5e6c1c436554a5e78fc795810c0e8adb3b7c68d1f9c5554f3bf3150064d88cd7",
+    "size": 90325
+   }
+  }
+ ],
+ "inputs": {
+  "census_sha256": "ede4f488d97fa4fe280174c262668c620b4844729c5b2c6cd5a3726be2daf1a0",
+  "screen_sha256": {
+   "giflib": "723ee75ab6cb0f73f35a1e59c99ed3c215b2317bf90529bc0db41ddb8dbadd42",
+   "jbig2dec": "945eea27b3f4d28b52c16f4113656d0832edd20e394d1f36c5abac70c6b2f274",
+   "md4c": "a30a2f8c69f4b49242f05c401be370cfa81924ef36fdb4f53eca83026eaadb03",
+   "mujs": "f6826a861ba0e9140596dcfc830e0ed079047bd3b2a1c9406549fb9aa08ab13f"
+  },
+  "screen_version": 1
+ },
+ "kind": "real-code pairs (Phase 9, D-009, D-037, D-038)",
+ "label_rules": "per pair, the root is the one function the fix changes (S2); it is labelled bad in the build of the fix's first parent and good in the build of the fix commit",
+ "pairs": [
+  {
+   "aliases": [],
+   "cve": "CVE-2016-7564",
+   "excluded_by": null,
+   "file": "jsfunction.c",
+   "fix": "a3a4fe840b80706c706e86160352af5936f292d8",
+   "pair_id": "rp-01",
+   "post": "rw-0002",
+   "post_addr": "0x16fbc",
+   "pre": "rw-0001",
+   "pre_addr": "0x16fbc",
+   "pre_commit": "f8234d830e17fc5e8fe09eb76d86dad3f6233c59",
+   "project": "mujs",
+   "root": "Fp_toString",
+   "s6": {
+    "pass": true,
+    "post": {
+     "closure": 364,
+     "gated": 364,
+     "leaks": [],
+     "redactions": 0
+    },
+    "pre": {
+     "closure": 364,
+     "gated": 364,
+     "leaks": [],
+     "redactions": 0
+    }
+   }
+  },
+  {
+   "aliases": [],
+   "cve": "CVE-2017-5627",
+   "excluded_by": null,
+   "file": "jsrun.c",
+   "fix": "4006739a28367c708dea19aeb19b8a1a9326ce08",
+   "pair_id": "rp-02",
+   "post": "rw-0004",
+   "post_addr": "0x28581",
+   "pre": "rw-0003",
+   "pre_addr": "0x28581",
+   "pre_commit": "8f62ea10a0af68e56d5c00720523ebcba13c2e6a",
+   "project": "mujs",
+   "root": "jsR_setproperty",
+   "s6": {
+    "pass": true,
+    "post": {
+     "closure": 364,
+     "gated": 364,
+     "leaks": [],
+     "redactions": 0
+    },
+    "pre": {
+     "closure": 364,
+     "gated": 364,
+     "leaks": [],
+     "redactions": 0
+    }
+   }
+  },
+  {
+   "aliases": [],
+   "cve": "CVE-2017-5628",
+   "excluded_by": null,
+   "file": "jsdate.c",
+   "fix": "8f62ea10a0af68e56d5c00720523ebcba13c2e6a",
+   "pair_id": "rp-03",
+   "post": "rw-0003",
+   "post_addr": "0xd926",
+   "pre": "rw-0005",
+   "pre_addr": "0xd926",
+   "pre_commit": "7e00def3c3c79534f1368a0b5bc0697b19683e60",
+   "project": "mujs",
+   "root": "MakeDay",
+   "s6": {
+    "pass": true,
+    "post": {
+     "closure": 7,
+     "gated": 7,
+     "leaks": [],
+     "redactions": 0
+    },
+    "pre": {
+     "closure": 7,
+     "gated": 7,
+     "leaks": [],
+     "redactions": 0
+    }
+   }
+  },
+  {
+   "aliases": [],
+   "cve": "CVE-2021-33797",
+   "excluded_by": null,
+   "file": "jsdtoa.c",
+   "fix": "833b6f1672b4f2991a63c4d05318f0b84ef4d550",
+   "pair_id": "rp-04",
+   "post": "rw-0007",
+   "post_addr": "0x11e70",
+   "pre": "rw-0006",
+   "pre_addr": "0x11e70",
+   "pre_commit": "292415b62547c0bec95ee63d836cb536c1ee9c84",
+   "project": "mujs",
+   "root": "js_strtod",
+   "s6": {
+    "pass": true,
+    "post": {
+     "closure": 1,
+     "gated": 1,
+     "leaks": [],
+     "redactions": 0
+    },
+    "pre": {
+     "closure": 1,
+     "gated": 1,
+     "leaks": [],
+     "redactions": 0
+    }
+   }
+  },
+  {
+   "aliases": [],
+   "cve": "CVE-2018-11536",
+   "excluded_by": null,
+   "file": "md4c.c",
+   "fix": "bf022cb6569457598fb37b266a4129d1aa01211b",
+   "pair_id": "rp-05",
+   "post": "rw-0009",
+   "post_addr": "0x19991",
+   "pre": "rw-0008",
+   "pre_addr": "0x19991",
+   "pre_commit": "e7b84d65a42048f812a006e88ca1b353d7828974",
+   "project": "md4c",
+   "root": "md_split_simple_pairing_mark",
+   "s6": {
+    "pass": true,
+    "post": {
+     "closure": 1,
+     "gated": 1,
+     "leaks": [],
+     "redactions": 0
+    },
+    "pre": {
+     "closure": 1,
+     "gated": 1,
+     "leaks": [],
+     "redactions": 0
+    }
+   }
+  },
+  {
+   "aliases": [],
+   "cve": "CVE-2018-11546",
+   "excluded_by": null,
+   "file": "md4c.c",
+   "fix": "e5feaf2c96a08390f89a72972b5f8b808ca34e79",
+   "pair_id": "rp-06",
+   "post": "rw-0011",
+   "post_addr": "0x13b00",
+   "pre": "rw-0010",
+   "pre_addr": "0x13b00",
+   "pre_commit": "469873ee6ce96ef475baa9993f56aa1893456ae0",
+   "project": "md4c",
+   "root": "md_is_named_entity_contents",
+   "s6": {
+    "pass": true,
+    "post": {
+     "closure": 1,
+     "gated": 1,
+     "leaks": [],
+     "redactions": 0
+    },
+    "pre": {
+     "closure": 1,
+     "gated": 1,
+     "leaks": [],
+     "redactions": 0
+    }
+   }
+  },
+  {
+   "aliases": [],
+   "cve": "CVE-2018-11547",
+   "excluded_by": null,
+   "file": "md4c.c",
+   "fix": "469873ee6ce96ef475baa9993f56aa1893456ae0",
+   "pair_id": "rp-07",
+   "post": "rw-0010",
+   "post_addr": "0x15132",
+   "pre": "rw-0012",
+   "pre_addr": "0x15132",
+   "pre_commit": "7deaccf65d01d5bde104efb3b6fd18aab8ae8392",
+   "project": "md4c",
+   "root": "md_is_link_label",
+   "s6": {
+    "pass": true,
+    "post": {
+     "closure": 2,
+     "gated": 2,
+     "leaks": [],
+     "redactions": 0
+    },
+    "pre": {
+     "closure": 2,
+     "gated": 2,
+     "leaks": [],
+     "redactions": 0
+    }
+   }
+  },
+  {
+   "aliases": [],
+   "cve": "CVE-2018-11490",
+   "excluded_by": null,
+   "file": "dgif_lib.c",
+   "fix": "08438a5098f3bb1de23a29334af55eba663f75bd",
+   "pair_id": "rp-08",
+   "post": "rw-0014",
+   "post_addr": "0x30b1",
+   "pre": "rw-0013",
+   "pre_addr": "0x30b1",
+   "pre_commit": "7b241f4398a6063df48844e65a0f65b0c7c498b1",
+   "project": "giflib",
+   "root": "DGifDecompressLine",
+   "s6": {
+    "pass": true,
+    "post": {
+     "closure": 4,
+     "gated": 4,
+     "leaks": [],
+     "redactions": 0
+    },
+    "pre": {
+     "closure": 4,
+     "gated": 4,
+     "leaks": [],
+     "redactions": 0
+    }
+   }
+  },
+  {
+   "aliases": [],
+   "cve": "CVE-2025-31344",
+   "excluded_by": "S6",
+   "file": "gif2rgb.c",
+   "fix": "7bbe8ea1a595bb7509ffa0a86b076e9b720e85af",
+   "pair_id": "rp-09",
+   "post": "rw-0016",
+   "post_addr": "0x7f7c",
+   "pre": "rw-0015",
+   "pre_addr": "0x7f7c",
+   "pre_commit": "c5e0a61f56022eb2315e211ede9ccd36c6779d88",
+   "project": "giflib",
+   "root": "DumpScreen2RGB",
+   "s6": {
+    "pass": false,
+    "post": {
+     "closure": 3,
+     "gated": 3,
+     "leaks": [
+      {
+       "addr": "0x7f7c",
+       "findings": [
+        "name:manifest:gif2rgb"
+       ]
+      }
+     ],
+     "redactions": 0
+    },
+    "pre": {
+     "closure": 3,
+     "gated": 3,
+     "leaks": [
+      {
+       "addr": "0x7f7c",
+       "findings": [
+        "name:manifest:gif2rgb"
+       ]
+      }
+     ],
+     "redactions": 0
+    }
+   }
+  },
+  {
+   "aliases": [],
+   "cve": "CVE-2026-26740",
+   "excluded_by": null,
+   "file": "egif_lib.c",
+   "fix": "061605081115bbfd7019bafc119a13b6f17fcf25",
+   "pair_id": "rp-10",
+   "post": "rw-0018",
+   "post_addr": "0x4c5d",
+   "pre": "rw-0017",
+   "pre_addr": "0x4c5d",
+   "pre_commit": "edff4aed17f857442ab0cac31566572ba08f93d3",
+   "project": "giflib",
+   "root": "EGifGCBToSavedExtension",
+   "s6": {
+    "pass": true,
+    "post": {
+     "closure": 4,
+     "gated": 4,
+     "leaks": [],
+     "redactions": 0
+    },
+    "pre": {
+     "closure": 4,
+     "gated": 4,
+     "leaks": [],
+     "redactions": 0
+    }
+   }
+  },
+  {
+   "aliases": [],
+   "cve": "CVE-2017-7975",
+   "excluded_by": "S6",
+   "file": "jbig2_huffman.c",
+   "fix": "f8992b8fe65c170c8624226f127c5c4bfed42c66",
+   "pair_id": "rp-11",
+   "post": "rw-0020",
+   "post_addr": "0x8860",
+   "pre": "rw-0019",
+   "pre_addr": "0x8860",
+   "pre_commit": "2b69772201628cfc44af64e35f900e2efd4b66e7",
+   "project": "jbig2dec",
+   "root": "jbig2_build_huffman_table",
+   "s6": {
+    "pass": false,
+    "post": {
+     "closure": 4,
+     "gated": 4,
+     "leaks": [
+      {
+       "addr": "0x8860",
+       "findings": [
+        "name:manifest:jbig2_build_huffman_table"
+       ]
+      }
+     ],
+     "redactions": 0
+    },
+    "pre": {
+     "closure": 4,
+     "gated": 4,
+     "leaks": [
+      {
+       "addr": "0x8860",
+       "findings": [
+        "name:manifest:jbig2_build_huffman_table"
+       ]
+      }
+     ],
+     "redactions": 0
+    }
+   }
+  }
+ ],
+ "schema": 1,
+ "toolchain": {
+  "cflags": [
+   "-g",
+   "-O0",
+   "-fno-inline",
+   "-fstack-protector-strong",
+   "-fcf-protection=full",
+   "-fPIE",
+   "-pie",
+   "-U_FORTIFY_SOURCE"
+  ],
+  "gcc": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
+  "strip": "GNU strip (GNU Binutils for Ubuntu) 2.46"
+ }
+}
