@@ -389,3 +389,25 @@ and every library call would become an unnamed `FUN_`.
 
 **Known limit, stated now:** a negative is clean only with respect to the CVEs in the census. A later bug
 fixed silently, without a CVE, is invisible to S7.
+
+## Deviation D-038 (2026-10-02, after screens S1-S5 and S7, before S6 and before any model call)
+
+**Reason:** operational points the Phase 9 text leaves open, settled before any model output exists.
+
+1. **S6, operationally.** Callee blocks are model output, so they do not exist before the walk. S6 gates
+   the full base prompt (the system prompt plus the function's own numbered code) of every function in
+   each root's downward closure, with both layers. Callee blocks are gated live during the walk, as in
+   every phase since D-026; a violation aborts the walk and is handled by an ADR, never a bypass.
+2. **R4 at the roots only.** R4 is the root's no-context prompt, which D-026 makes byte-identical to
+   `analyze-one`. It is computed with `analyze-one` on each root, not with `--with-baseline` over the
+   whole closure: only roots are scored, and the closure-wide baseline would roughly double the GPU time
+   for rows that are never scored.
+3. **R1-R3 over whole programs.** At a root, R1 and R2 read only the root, and R3 reads only the functions
+   reachable from it, which is exactly the walk's closure. Computing them over the whole program therefore
+   gives the same root values, and reuses the Phase 8 code unchanged.
+4. **A descriptive breakdown.** A root whose walk prompt carries no callee block gets the same prompt in R4
+   and R5 by construction (Phase 8's S0). The screens show three such roots among the 11 pairs that passed
+   S1-S5 and S7 (`js_strtod`, `md_split_simple_pairing_mark`, `md_is_named_entity_contents`); the walk
+   confirms it from `context_chars`. Pair outcomes are printed with these pairs set apart.
+5. **Not run: the typed ladder.** The Phase 9 statistics do not register it, and the real CWEs (787, 125,
+   119, ...) lie outside the D-021 table. No mechanism labels are made.
