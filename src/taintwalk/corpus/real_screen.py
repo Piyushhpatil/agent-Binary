@@ -126,9 +126,22 @@ def recipe_jbig2dec(tree: Path) -> tuple[list[str], list[str], list[str]]:
     return _rel(tree, files), ["-DHAVE_STDINT_H"], ["-lm"]
 
 
+LUA_SKIP = {"onelua.c", "ltests.c", "luac.c"}
+
+
+def recipe_lua(tree: Path) -> tuple[list[str], list[str], list[str]]:
+    """Lua's interpreter: every .c file of the core and the standard libraries plus lua.c. The development
+    repository keeps them at the top level (a release tarball uses src/). Left out: onelua.c (the
+    amalgamation), ltests.c (the test-suite library) and luac.c (a second program). LUA_USE_POSIX and
+    LUA_USE_DLOPEN are what the makefile's linux target sets, without readline (D-039)."""
+    base = tree / "src" if (tree / "src" / "lua.c").exists() else tree
+    files = [p for p in base.glob("*.c") if p.name not in LUA_SKIP]
+    return _rel(tree, files), ["-DLUA_USE_POSIX", "-DLUA_USE_DLOPEN"], ["-lm", "-ldl"]
+
+
 RECIPES: dict[str, Recipe] = {"giflib": recipe_giflib, "jbig2dec": recipe_jbig2dec,
-                              "md4c": recipe_md4c, "mujs": recipe_mujs}
-HEAD_REF = {"giflib": "origin/HEAD", "jbig2dec": "origin/HEAD", "md4c": "origin/HEAD",
+                              "lua": recipe_lua, "md4c": recipe_md4c, "mujs": recipe_mujs}
+HEAD_REF = {"lua": "origin/HEAD", "giflib": "origin/HEAD", "jbig2dec": "origin/HEAD", "md4c": "origin/HEAD",
             "mujs": "codeberg/HEAD"}                          # GitHub's mujs HEAD is a migration stub
 
 
@@ -498,11 +511,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--validate-recipes", action="store_true",
                    help="build each project's head and nearest release tags (never a candidate)")
     p.add_argument("--project", choices=sorted(RECIPES), help="screen this project's candidates")
+    p.add_argument("--census", default=str(CENSUS),
+                   help="census.json to screen from (the reserve project has its own, D-039)")
     a = p.parse_args(argv)
-    if not CENSUS.exists():
-        print(f"SCREEN FAIL: {CENSUS} is missing; run the census first")
+    census_path = Path(a.census) if Path(a.census).is_absolute() else REPO_ROOT / a.census
+    if not census_path.exists():
+        print(f"SCREEN FAIL: {census_path} is missing; run the census first")
         return 1
-    census = json.loads(CENSUS.read_text(encoding="utf-8"))
+    census = json.loads(census_path.read_text(encoding="utf-8"))
     if census.get("census_version", 0) < 2:
         print("SCREEN FAIL: the census has no S7 commit sets; re-run python -m taintwalk.corpus.real")
         return 1

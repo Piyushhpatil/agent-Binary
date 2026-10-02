@@ -49,7 +49,10 @@ PROJECTS: dict[str, tuple[str, str | None, str]] = {
     "md4c": ("md4c", "mity/md4c", "https://github.com/mity/md4c"),
     "giflib": ("giflib", None, "https://git.code.sf.net/p/giflib/code"),
     "jbig2dec": ("jbig2dec", "ArtifexSoftware/jbig2dec", "https://github.com/ArtifexSoftware/jbig2dec"),
+    "lua": ("lua", "lua/lua", "https://github.com/lua/lua"),
 }
+ORIGINAL = ("giflib", "jbig2dec", "md4c", "mujs")   # the four projects the Phase 9 pre-registration names
+RESERVE = ("lua",)                                  # added only when fewer than 10 pairs survive (D-039)
 
 IN_CWES = frozenset({
     "CWE-78", "CWE-119", "CWE-120", "CWE-121", "CWE-122", "CWE-124", "CWE-125", "CWE-126",
@@ -102,16 +105,19 @@ def _get(url: str, accept: str) -> bytes:
         return r.read()
 
 
-def fetch_nvd(out_dir: Path) -> dict[str, Any]:
+def fetch_nvd(out_dir: Path, projects: tuple[str, ...]) -> dict[str, Any]:
     """One NVD keyword query per project, hashed, so the decision pass is reproducible."""
     out_dir.mkdir(parents=True, exist_ok=True)
     rows = []
-    for i, name in enumerate(sorted(PROJECTS)):
+    for i, name in enumerate(sorted(projects)):
         if i:
             time.sleep(NVD_PAUSE_S)
         raw = _get(NVD_URL.format(name), "application/json")
         (out_dir / f"{name}.json").write_bytes(raw)
         doc = json.loads(raw)
+        if doc.get("totalResults", 0) > len(doc.get("vulnerabilities", [])):
+            raise CensusError(f"{name}: NVD returned {len(doc.get('vulnerabilities', []))} of "
+                              f"{doc.get('totalResults')} results; this census does not paginate")
         rows.append({"project": name, "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest(),
                      "total_results": doc.get("totalResults"),
                      "vulnerabilities": len(doc.get("vulnerabilities", []))})
@@ -401,7 +407,7 @@ def collapse_and_cap(rows: list[dict[str, Any]]) -> None:
                 r["exclusion"] = f"same fix commit {sha[:12]} as {keeper['cve']} (one pair per change)"
 
     rng = random.Random(SEED)
-    for name in sorted(PROJECTS):
+    for name in sorted({r["project"] for r in rows}):
         kept = sorted((r for r in rows if r["project"] == name and r["kept"]),
                       key=lambda r: r["cve"])
         if len(kept) <= PER_PROJECT_CAP:
@@ -414,10 +420,11 @@ def collapse_and_cap(rows: list[dict[str, Any]]) -> None:
                                   f"{PER_PROJECT_CAP}, seed {SEED}")
 
 
-def census(nvd_dir: Path, src_dir: Path, gh_dir: Path, fetch: bool) -> dict[str, Any]:
+def census(nvd_dir: Path, src_dir: Path, gh_dir: Path, fetch: bool,
+           projects: tuple[str, ...] = ORIGINAL) -> dict[str, Any]:
     rows: list[dict[str, Any]] = []
     repos: dict[str, Any] = {}
-    for name in sorted(PROJECTS):
+    for name in sorted(projects):
         path = nvd_dir / f"{name}.json"
         if not path.exists():
             raise CensusError(f"{path} is missing; run with --fetch first")
@@ -434,7 +441,7 @@ def census(nvd_dir: Path, src_dir: Path, gh_dir: Path, fetch: bool) -> dict[str,
         "seed": SEED, "per_project_cap": PER_PROJECT_CAP,
         "repositories": repos,
         "counts": {"rows": len(rows), "kept": len(kept),
-                   "by_project": {n: sum(r["project"] == n for r in kept) for n in sorted(PROJECTS)}},
+                   "by_project": {n: sum(r["project"] == n for r in kept) for n in sorted(projects)}},
         "candidates": kept,
         "rows": rows,
     }
@@ -456,7 +463,7 @@ def report(doc: dict[str, Any]) -> int:
     total = doc["counts"]["kept"]
     print(f"[census] total candidates {total} (screens S1-S6 come next; the pairs that survive are "
           f"the corpus)")
-    if total < MIN_PAIRS:
+    if total < MIN_PAIRS and set(doc["counts"]["by_project"]) <= set(ORIGINAL):
         print(f"[census] below {MIN_PAIRS}: the Lua reserve is pre-registered and must be added by ADR")
     print("CENSUS OK" if total else "CENSUS FAIL: no candidates")
     return 0 if total else 1
@@ -468,15 +475,23 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out", default="runs/p9-census", help="where census.json and snapshots go")
     p.add_argument("--src", default="runs/p9-spike/src", help="dir holding one clone per project")
     p.add_argument("--fetch", action="store_true", help="snapshot NVD and GitHub events first")
+    p.add_argument("--projects", default=",".join(ORIGINAL),
+                   help="comma-separated projects (default: the four pre-registered ones; the reserve, "
+                        "lua, is censused on its own, D-039)")
     a = p.parse_args(argv)
+    projects = tuple(sorted({x.strip() for x in a.projects.split(",") if x.strip()}))
+    unknown = [x for x in projects if x not in PROJECTS]
+    if not projects or unknown:
+        print(f"CENSUS FAIL: unknown projects {unknown or a.projects!r}")
+        return 1
 
     out = Path(a.out) if Path(a.out).is_absolute() else REPO_ROOT / a.out
     src = Path(a.src) if Path(a.src).is_absolute() else REPO_ROOT / a.src
     nvd_dir, gh_dir = out / "nvd", out / "gh"
     try:
         if a.fetch:
-            fetch_nvd(nvd_dir)
-        doc = census(nvd_dir, src, gh_dir, a.fetch)
+            fetch_nvd(nvd_dir, projects)
+        doc = census(nvd_dir, src, gh_dir, a.fetch, projects)
     except CensusError as e:
         print(f"CENSUS FAIL: {e}")
         return 1

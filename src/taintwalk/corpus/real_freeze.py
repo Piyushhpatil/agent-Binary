@@ -1,6 +1,7 @@
 """Phase 9: freeze the real-code corpus and run screen S6 (D-009, D-037, D-038). Evaluation side.
 
-Input: runs/p9-screen/<project>/screen.json for the four projects. Every pair that passed S1-S5 and S7
+Input: runs/p9-screen/<project>/screen.json for the four pre-registered projects and the reserve, lua
+(D-039). Every pair that passed S1-S5 and S7
 enters, and this module:
   1. names every distinct binary opaquely (rw-NNNN, in order of first use by the sorted pairs) and writes
      corpus/real/manifest.json: one entry per binary in the Juliet manifest's shape, so
@@ -34,9 +35,10 @@ from taintwalk.extract.ghidra_runner import sha256_file
 from taintwalk.util.leakcheck import LeakError
 
 MANIFEST_SCHEMA = 1
-PROJECTS = ("mujs", "md4c", "giflib", "jbig2dec")
+PROJECTS = ("mujs", "md4c", "giflib", "jbig2dec", "lua")   # lua last: the reserve's pairs follow (D-039)
 REAL_RUN = REPO_ROOT / "runs" / "p9-real"
 CENSUS = REPO_ROOT / "runs" / "p9-census" / "census.json"
+RESERVE_CENSUS = REPO_ROOT / "runs" / "p9-census-lua" / "census.json"
 MIN_PAIRS = 10                       # pre-registered: below this, the Lua reserve is added by ADR
 
 
@@ -168,7 +170,8 @@ def freeze() -> dict[str, Any]:
         "kind": "real-code pairs (Phase 9, D-009, D-037, D-038)",
         "toolchain": {"gcc": _first_line(["gcc", "--version"]), "strip": _first_line(["strip", "--version"]),
                       "cflags": list(CFLAGS)},
-        "inputs": {"census_sha256": sha256_file(CENSUS), "screen_sha256": digests,
+        "inputs": {"census_sha256": sha256_file(CENSUS), "reserve_census_sha256": sha256_file(RESERVE_CENSUS),
+                   "screen_sha256": digests,
                    "screen_version": SCREEN_VERSION},
         "label_rules": ("per pair, the root is the one function the fix changes (S2); it is labelled bad in "
                         "the build of the fix's first parent and good in the build of the fix commit"),
@@ -228,8 +231,8 @@ def report(m: dict[str, Any]) -> int:
     print(f"manifest           : {m['_out']}")
     print(f"walk list          : {REAL_RUN / 'programs.txt'}")
     if len(final) < MIN_PAIRS:
-        print(f"[freeze] RESERVE: {len(final)} pairs < {MIN_PAIRS}; the Lua reserve is pre-registered and must "
-              "be added by ADR before any model call")
+        print(f"[freeze] SHORTFALL: {len(final)} pairs < {MIN_PAIRS} with the reserve included; disclosed, "
+              "and no other project may be added (D-039)")
     print("FREEZE OK")
     return 0
 
