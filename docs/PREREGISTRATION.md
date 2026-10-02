@@ -157,3 +157,193 @@ cost rule, the full cloud walk), then report the full family of 10 tests and the
      the model relied on it. "ignored constant argument" is used only when a constant reaches a sink in the root's
      own code.
   2. other: no category fits; the note names the pattern.
+
+---
+
+# TaintWalk — Phase 9 Pre-registration (real-code generalization)
+
+**Written:** 2026-10-01, before the census ran, before any real-code binary was built, and before any
+real-code model call. The git history of this file is its timestamp.
+**Source of record:** ADRs D-009 (corpus, census, screens, labels) and D-036 (walk scope, scorer,
+statistics), logged in `DECISIONS.md` at the Phase 9 hand-off.
+**Amends D-008:** the path-root definition, for real code only. See "The root" below.
+
+Any deviation is logged as a new ADR and disclosed in `docs/RESULTS.md`, with its reason.
+
+## The question
+
+Do the Phase 8 Juliet results transfer to real open-source C code? Phase 8's headline rung R5 is
+statistically indistinguishable from flawfinder plus reachability (C3L), and a one-line input rule has
+the best F1. This phase measures whether that picture holds, improves or collapses off Juliet.
+
+This corpus is **held out**. No prompt, callee renderer, sanitizer, schema or model setting is changed
+because of anything measured here. A code bug may be fixed by ADR and the run repeated; prompts never
+change.
+
+## What is measured
+
+- **Unit: the pair.** One vulnerable function and its patched self, compiled from the fix commit's first
+  parent and from the fix commit. Both halves of a pair are the same function in the same project with
+  the same build recipe, so the only difference is the patch.
+- **The root is the fix site**, the one function the fix commit changed, **not** the function the
+  advisory names. Verified in the census review: CVE-2016-7563's advisory names `chartorune` while the
+  fix changed `lexcomment`; CVE-2018-12112's advisory names `md_build_attribute` while the fix changed
+  `md_rollback`. A real-code label is a claim about the function the patch changed.
+  - This **amends D-008** for real code. D-008's literal rule (the lowest function from which source and
+    unsafe operation are both in view) puts every real-code root at the CLI's `main`, which is not a
+    claim about any function's own code.
+- **Positives** are pre-fix roots; **negatives** are post-fix roots. Target 10-20 pairs.
+- Results are reported in their own section of `docs/RESULTS.md` and are **never pooled with Juliet**.
+
+## Project selection (fixed)
+
+mujs, md4c, giflib, jbig2dec. Criteria, all required: pure C; builds from a file list with plain gcc and
+no generated configuration header; an in-tree command-line program; at least five memory-safety CVEs with
+commit-level fix references.
+
+**Reserve, pre-registered:** if fewer than 10 pairs survive the screens, Lua is added under the same rules
+and the shortfall is disclosed. No other project may be added.
+
+**Rejected:** libexpat, because it needs a generated config header, and because its 2.4.3 fix patches six
+functions in one commit with several new checks inside `#if UINT_MAX >= SIZE_MAX`, which is false on
+x86_64 — so "the patch changed F" would not imply "F's binary changed".
+
+## Census (D-009)
+
+Fully mechanical, from recorded snapshots, with every exclusion reason written out.
+
+**Sources, snapshotted and hashed:** the NVD API 2.0 keyword query per project; each project's git
+repository at a recorded HEAD; GitHub issue-event JSON where used. mujs is read from Codeberg, which is
+canonical since 2025 and contains the whole GitHub history.
+
+**Project match:** a CPE whose product field is the project name, or the project name as a whole word in
+the description. Anything else is "other product".
+
+**Scope, two signals.** Signal A is the advisory's CWE set and description; signal B is the fix commit's
+message. Each signal is in-scope, out-of-scope or silent.
+- In-scope CWEs: 78, 119, 120, 121, 122, 124, 125, 126, 127, 129, 131, 134, 190, 191, 193, 369, 606, 680,
+  787, 788, 789, 805, 806, 823. In-scope words: buffer overflow, buffer over-read, buffer overrun,
+  out-of-bounds, integer overflow, integer underflow, divide by zero, format string, off-by-one.
+- Out-of-scope CWEs: 400, 401, 415, 416, 457, 476, 617, 674, 704, 772, 835, 843, 908. Out-of-scope words:
+  use-after-free, double free, null pointer, memory leak, infinite loop, recursion, stack exhaustion,
+  assertion.
+- **A candidate is in scope only if no signal is out-of-scope and at least one is in-scope.** An
+  out-of-scope signal from either side excludes, whatever the other says.
+  - This rule exists because NVD's CWE alone is wrong often enough to matter: CVE-2022-44789 carries
+    CWE-787, while the advisory and the maintainer both describe a use-after-free.
+  - The rule is one-directional by design. An out-of-scope advisory is never pulled back in by a
+    promising commit message, because that would be hand-picking.
+- Rejected classes and why: use-after-free, double free, NULL dereference, memory leaks, unbounded
+  recursion and infinite loops have no D-021 mechanism, and adding one would change the frozen prompt.
+
+**Resolution of the fix commit**, first source that yields any commit touching a `.c` file:
+1. a commit hash in an NVD reference URL;
+2. the CVE id in a commit message;
+3. GitHub's closed-by-commit event for a referenced issue of that project;
+4. the referenced bug or issue number in a commit message.
+
+Exactly one such commit is `unique`; more than one is `ambiguous`; none is `none`. Only `unique` proceeds.
+Source 4 is the weakest and the only one observed to fail, which the next two rules contain.
+
+**Exclusions after resolution:**
+- **Incomplete-fix follow-ups.** A description saying the CVE exists because of an incomplete fix for
+  another CVE is excluded: its advisory cites the superseded bug, so the resolved commit is the one it
+  says was insufficient. CVE-2016-9109 is the observed instance.
+- **Shared fix commits collapse to one pair.** Two CVEs resolving to the same commit are the same code
+  change; the lowest CVE id is kept and the other recorded as an alias.
+
+**Cap and draw:** at most 5 candidates per project. Where a project has more, the kept set is drawn with
+seed 20261001 over the sorted candidate ids. Drawn and undrawn are both recorded.
+
+**Not a screen:** function size. A root whose prompt overflows the context stays in and counts as an
+abstention, and coverage is reported as a result. Dropping large functions would quietly build an easy
+corpus.
+
+## Screens (D-009), all before any model call
+
+- **S1** the fix commit resolves in the recorded repository.
+- **S2** the fix changes exactly one C function, decided by mapping changed line ranges through each
+  build's DWARF line table. The hunk-header function names recorded by the census are a preview only and
+  decide nothing.
+- **S3** both versions build under gcc 15 with the D-014 flags plus `-g -O0 -fno-inline`; `cp` then
+  `strip` (G1); `.text` address, size and byte hash identical across the pair's own two files (G2).
+- **S4** Ghidra recovers the root in both builds and it joins by address.
+- **S5** the root's pseudo-C differs between pre and post, after normalising the addresses inside
+  `FUN_`/`DAT_`/`LAB_` names. This is what the libexpat case showed is necessary: a patched source line
+  need not change the compiled function the model sees.
+- **S6** the leak gate passes on every prompt in the root's walk closure.
+
+A candidate failing any screen is excluded with that screen named. No candidate is excluded by judgement.
+
+## Build and binary shape
+
+Each version is statically linked into the project's own command-line program, so the stripped binary
+exposes no exported function names in `.dynsym`. A stripped shared object would keep every exported
+symbol, and the model would read real function names instead of `FUN_...`.
+
+## Leak gate on real code
+
+- Per-binary denylist: the root's name, its source file name and stem, and the CVE ids.
+- `util/leakcheck.py` gains a pattern rejecting CVE ids, and learns to resolve a binary through either the
+  Juliet manifest or the real-code manifest. There is still no bypass and no warn mode (D-017).
+- A pair tripping the gate is excluded at S6, before any model call.
+- No layer can detect a model that memorised a famous CVE. The pair design is the only defence: a model
+  recalling "this function had a CVE" flags both halves, which scores as both-vulnerable, never as a
+  correct pair. The rate of both-vulnerable pairs is reported.
+
+## Walk scope and rung alignment (D-036)
+
+- The walk covers each root's downward closure only. A function's prompt depends on its callees alone, so
+  closure walking gives the roots prompts byte-identical to a whole-program walk, at a fraction of the
+  calls. Proven by replaying the Juliet runs offline and requiring identical `summaries.json`.
+- `plan_walk` skips functions with no in-scope caller and no in-scope callee. Inside a closure a root has
+  no caller, so a leaf root would be skipped; the closure walk forces every root into the plan.
+- R1, R2 and R3 are computed over exactly the set the walk analysed, not over whole programs, so every
+  rung answers for the same functions (I6).
+
+## Statistics (D-036), pre-registered
+
+Descriptive only. At 10-20 pairs there are no p-values, and none will be computed.
+
+- Per rung R1-R5: recall, specificity, precision and coverage, each with a 95% Wilson interval.
+- **Pair outcomes**, the paired-evaluation convention: pair-correct (pre flagged, post clear),
+  both-vulnerable, both-clear, reversed.
+- **Gap table** against Phase 8 on recall and specificity, which do not depend on the positive rate.
+  Precision and F1 are shown with an explicit base-rate note: Juliet roots are 38% positive and this
+  corpus is 50% positive by construction, and neither resembles real code.
+- Also reported: how many post-fix roots gained a string literal the pre-fix root lacked, which tests the
+  D-018 sanitizer-literal shortcut on real code.
+
+## Predicted failure modes
+
+Written down now so that none of them can be presented afterwards as an explanation that happens to
+excuse the result.
+
+1. **Roots that only lack a check.** Where the fix added a guard in a caller of the crash site, the
+   pre-fix root contains no unsafe operation. A model reasoning about that function alone has little to
+   find. Observed in the census for CVE-2016-7563 and CVE-2018-12112.
+2. **Patch too small to see.** A one-comparison fix may leave the decompiled function nearly identical, so
+   both halves get the same verdict.
+3. **Context overflow.** Real functions are far larger than Juliet's 4,347-character maximum. Overflows
+   count as abstentions against recall.
+4. **The input rule generalises badly in the other direction.** In real code almost everything is
+   reachable from input, so R2 should flag nearly everything and lose the F1 lead it held on Juliet.
+5. **Indirect calls.** Real code uses function-pointer tables that Ghidra may not resolve, leaving the
+   closure incomplete. Reported as a count.
+
+## Gap analysis codebook
+
+Every R5 error is coded with the D-032 codebook, plus the two categories D-035 found missing
+("`rand()` treated as trusted", "declined a correct callee verdict"), plus two for real code:
+"abstained: context overflow" and "root only lacks a check" (failure mode 1). Coding is AI-assisted and
+author-reviewed, disclosed exactly as D-035 requires.
+
+## Disclosure
+
+- Nothing in this corpus was seen before the census ran. The projects were chosen by the criteria above;
+  the CVEs by the census rules.
+- Three candidates were excluded during the census review, before any build: CVE-2022-44789
+  (use-after-free despite CWE-787), CVE-2016-9109 (incomplete-fix follow-up, wrong commit), CVE-2019-11412
+  (no in-scope mechanism). Each is recorded in `census.json` with its rule.
+- The two seed examples read while choosing projects, CVE-2021-33797 (mujs) and CVE-2019-15133 (giflib),
+  are disclosed here and are not exempt from any screen.
