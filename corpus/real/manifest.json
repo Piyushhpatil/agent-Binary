@@ -1277,13 +1277,507 @@
     "sha256": "5e6c1c436554a5e78fc795810c0e8adb3b7c68d1f9c5554f3bf3150064d88cd7",
     "size": 90325
    }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-DLUA_USE_POSIX",
+    "-DLUA_USE_DLOPEN",
+    "-o",
+    "../bin.elf",
+    "lapi.c",
+    "lauxlib.c",
+    "lbaselib.c",
+    "lcode.c",
+    "lcorolib.c",
+    "lctype.c",
+    "ldblib.c",
+    "ldebug.c",
+    "ldo.c",
+    "ldump.c",
+    "lfunc.c",
+    "lgc.c",
+    "linit.c",
+    "liolib.c",
+    "llex.c",
+    "lmathlib.c",
+    "lmem.c",
+    "loadlib.c",
+    "lobject.c",
+    "lopcodes.c",
+    "loslib.c",
+    "lparser.c",
+    "lstate.c",
+    "lstring.c",
+    "lstrlib.c",
+    "ltable.c",
+    "ltablib.c",
+    "ltm.c",
+    "lua.c",
+    "lundump.c",
+    "lutf8lib.c",
+    "lvm.c",
+    "lzio.c",
+    "-lm",
+    "-ldl"
+   ],
+   "case_id": "rw-0021",
+   "commit": "a2195644d89812e5b157ce7bac35543e06db05e3",
+   "deny": [
+    "CVE-2020-24342"
+   ],
+   "elf": "runs/p9-screen/build/lua-a2195644d898/bin.elf",
+   "elf_sha256": "e2ea65d4140d8f8c9284b44e7c5a7f2525ae86dc3377ef10f3914362fe1be082",
+   "functions": [
+    {
+     "addr": 96548,
+     "addr_hex": "0x17924",
+     "cu": "ldo.c",
+     "label": "bad",
+     "name": "luaD_callnoyield",
+     "pair": "rp-12",
+     "role": "root",
+     "size": 130
+    }
+   ],
+   "project": "lua",
+   "source_files": [
+    "ldo.c"
+   ],
+   "stripped": "runs/p9-screen/build/lua-a2195644d898/bin.stripped.elf",
+   "stripped_sha256": "1a19e4f36eb90f57e87d8ac4982b11ff95e2ae2eb957fa09541fcf1756b80089",
+   "text": {
+    "addr": 23328,
+    "sha256": "ce9c606b30012f54e27fecd26802f813244713be5709127de1f0ab6d2fc11a72",
+    "size": 262492
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-DLUA_USE_POSIX",
+    "-DLUA_USE_DLOPEN",
+    "-o",
+    "../bin.elf",
+    "lapi.c",
+    "lauxlib.c",
+    "lbaselib.c",
+    "lcode.c",
+    "lcorolib.c",
+    "lctype.c",
+    "ldblib.c",
+    "ldebug.c",
+    "ldo.c",
+    "ldump.c",
+    "lfunc.c",
+    "lgc.c",
+    "linit.c",
+    "liolib.c",
+    "llex.c",
+    "lmathlib.c",
+    "lmem.c",
+    "loadlib.c",
+    "lobject.c",
+    "lopcodes.c",
+    "loslib.c",
+    "lparser.c",
+    "lstate.c",
+    "lstring.c",
+    "lstrlib.c",
+    "ltable.c",
+    "ltablib.c",
+    "ltm.c",
+    "lua.c",
+    "lundump.c",
+    "lutf8lib.c",
+    "lvm.c",
+    "lzio.c",
+    "-lm",
+    "-ldl"
+   ],
+   "case_id": "rw-0022",
+   "commit": "34affe7a63fc5d842580a9f23616d057e17dfe27",
+   "deny": [
+    "CVE-2020-24342"
+   ],
+   "elf": "runs/p9-screen/build/lua-34affe7a63fc/bin.elf",
+   "elf_sha256": "607e6517b23de3450dbab6e7243edb75d7c657b9e06b646f01189a1f0dbd6a4e",
+   "functions": [
+    {
+     "addr": 96548,
+     "addr_hex": "0x17924",
+     "cu": "ldo.c",
+     "label": "good",
+     "name": "luaD_callnoyield",
+     "pair": "rp-12",
+     "role": "root",
+     "size": 153
+    }
+   ],
+   "project": "lua",
+   "source_files": [
+    "ldo.c"
+   ],
+   "stripped": "runs/p9-screen/build/lua-34affe7a63fc/bin.stripped.elf",
+   "stripped_sha256": "3c3c189b48eabef38bf105fe7d39dfd289b1ecfbd0abac241fef441d7a739595",
+   "text": {
+    "addr": 23328,
+    "sha256": "8b92eeca906502e9c227eb44b89651046fb9923bdc2b6cc0e8970e10ab786f87",
+    "size": 262515
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-DLUA_USE_POSIX",
+    "-DLUA_USE_DLOPEN",
+    "-o",
+    "../bin.elf",
+    "lapi.c",
+    "lauxlib.c",
+    "lbaselib.c",
+    "lcode.c",
+    "lcorolib.c",
+    "lctype.c",
+    "ldblib.c",
+    "ldebug.c",
+    "ldo.c",
+    "ldump.c",
+    "lfunc.c",
+    "lgc.c",
+    "linit.c",
+    "liolib.c",
+    "llex.c",
+    "lmathlib.c",
+    "lmem.c",
+    "loadlib.c",
+    "lobject.c",
+    "lopcodes.c",
+    "loslib.c",
+    "lparser.c",
+    "lstate.c",
+    "lstring.c",
+    "lstrlib.c",
+    "ltable.c",
+    "ltablib.c",
+    "ltm.c",
+    "lua.c",
+    "lundump.c",
+    "lutf8lib.c",
+    "lvm.c",
+    "lzio.c",
+    "-lm",
+    "-ldl"
+   ],
+   "case_id": "rw-0023",
+   "commit": "066e0f93c4901e601d93e31fb700f8f66f95feb8",
+   "deny": [
+    "CVE-2021-45985"
+   ],
+   "elf": "runs/p9-screen/build/lua-066e0f93c490/bin.elf",
+   "elf_sha256": "c40a0d9d5364f847cc05e75826326dfe97ec26d6dedf5e26c85732887e14d3cc",
+   "functions": [
+    {
+     "addr": 97644,
+     "addr_hex": "0x17d6c",
+     "cu": "ldo.c",
+     "label": "bad",
+     "name": "luaD_pretailcall",
+     "pair": "rp-13",
+     "role": "root",
+     "size": 603
+    }
+   ],
+   "project": "lua",
+   "source_files": [
+    "ldo.c"
+   ],
+   "stripped": "runs/p9-screen/build/lua-066e0f93c490/bin.stripped.elf",
+   "stripped_sha256": "5cc455d1f69f278750a3f413d9fca9d217c19d80b1c738894e3f2d874ef5a228",
+   "text": {
+    "addr": 23392,
+    "sha256": "41c6df9e3c1286c04674519b4660d6157043e8b6fddb23609a3367d04062b913",
+    "size": 268207
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-DLUA_USE_POSIX",
+    "-DLUA_USE_DLOPEN",
+    "-o",
+    "../bin.elf",
+    "lapi.c",
+    "lauxlib.c",
+    "lbaselib.c",
+    "lcode.c",
+    "lcorolib.c",
+    "lctype.c",
+    "ldblib.c",
+    "ldebug.c",
+    "ldo.c",
+    "ldump.c",
+    "lfunc.c",
+    "lgc.c",
+    "linit.c",
+    "liolib.c",
+    "llex.c",
+    "lmathlib.c",
+    "lmem.c",
+    "loadlib.c",
+    "lobject.c",
+    "lopcodes.c",
+    "loslib.c",
+    "lparser.c",
+    "lstate.c",
+    "lstring.c",
+    "lstrlib.c",
+    "ltable.c",
+    "ltablib.c",
+    "ltm.c",
+    "lua.c",
+    "lundump.c",
+    "lutf8lib.c",
+    "lvm.c",
+    "lzio.c",
+    "-lm",
+    "-ldl"
+   ],
+   "case_id": "rw-0024",
+   "commit": "cf613cdc6fa367257fc61c256f63d917350858b5",
+   "deny": [
+    "CVE-2021-45985"
+   ],
+   "elf": "runs/p9-screen/build/lua-cf613cdc6fa3/bin.elf",
+   "elf_sha256": "e629adb656b0418826403cb0e92ae0a6b6c8aa4a01c164ff9c2f6132547a9bee",
+   "functions": [
+    {
+     "addr": 97644,
+     "addr_hex": "0x17d6c",
+     "cu": "ldo.c",
+     "label": "good",
+     "name": "luaD_pretailcall",
+     "pair": "rp-13",
+     "role": "root",
+     "size": 649
+    }
+   ],
+   "project": "lua",
+   "source_files": [
+    "ldo.c"
+   ],
+   "stripped": "runs/p9-screen/build/lua-cf613cdc6fa3/bin.stripped.elf",
+   "stripped_sha256": "bec8371affde0d689b3a46262981b41d2bed331a32272fd5954fbbd7c9c6689c",
+   "text": {
+    "addr": 23392,
+    "sha256": "958011042bf06a180c13e63c7d9259a45ecef228677355b507a11f876c5f727f",
+    "size": 268253
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-DLUA_USE_POSIX",
+    "-DLUA_USE_DLOPEN",
+    "-o",
+    "../bin.elf",
+    "lapi.c",
+    "lauxlib.c",
+    "lbaselib.c",
+    "lcode.c",
+    "lcorolib.c",
+    "lctype.c",
+    "ldblib.c",
+    "ldebug.c",
+    "ldo.c",
+    "ldump.c",
+    "lfunc.c",
+    "lgc.c",
+    "linit.c",
+    "liolib.c",
+    "llex.c",
+    "lmathlib.c",
+    "lmem.c",
+    "loadlib.c",
+    "lobject.c",
+    "lopcodes.c",
+    "loslib.c",
+    "lparser.c",
+    "lstate.c",
+    "lstring.c",
+    "lstrlib.c",
+    "ltable.c",
+    "ltablib.c",
+    "ltm.c",
+    "lua.c",
+    "lundump.c",
+    "lutf8lib.c",
+    "lvm.c",
+    "lzio.c",
+    "-lm",
+    "-ldl"
+   ],
+   "case_id": "rw-0025",
+   "commit": "25b143dd34fb587d1e35290c4b25bc08954800e2",
+   "deny": [
+    "CVE-2022-28805"
+   ],
+   "elf": "runs/p9-screen/build/lua-25b143dd34fb/bin.elf",
+   "elf_sha256": "866381914c9903a9abc661e9e06e4b946ffee7c961e8f35ccc42c41225451f5e",
+   "functions": [
+    {
+     "addr": 166512,
+     "addr_hex": "0x28a70",
+     "cu": "lparser.c",
+     "label": "bad",
+     "name": "singlevar",
+     "pair": "rp-14",
+     "role": "root",
+     "size": 192
+    }
+   ],
+   "project": "lua",
+   "source_files": [
+    "lparser.c"
+   ],
+   "stripped": "runs/p9-screen/build/lua-25b143dd34fb/bin.stripped.elf",
+   "stripped_sha256": "58f45e7bfdaeec7745da3c4321d774260454abb8a7b18436c117dbfd39be216e",
+   "text": {
+    "addr": 23392,
+    "sha256": "74c4bacd196de7862b71ae5e8759664d6125080672a969c88db4d31adbea5731",
+    "size": 268275
+   }
+  },
+  {
+   "build_cmd": [
+    "gcc",
+    "-g",
+    "-O0",
+    "-fno-inline",
+    "-fstack-protector-strong",
+    "-fcf-protection=full",
+    "-fPIE",
+    "-pie",
+    "-U_FORTIFY_SOURCE",
+    "-DLUA_USE_POSIX",
+    "-DLUA_USE_DLOPEN",
+    "-o",
+    "../bin.elf",
+    "lapi.c",
+    "lauxlib.c",
+    "lbaselib.c",
+    "lcode.c",
+    "lcorolib.c",
+    "lctype.c",
+    "ldblib.c",
+    "ldebug.c",
+    "ldo.c",
+    "ldump.c",
+    "lfunc.c",
+    "lgc.c",
+    "linit.c",
+    "liolib.c",
+    "llex.c",
+    "lmathlib.c",
+    "lmem.c",
+    "loadlib.c",
+    "lobject.c",
+    "lopcodes.c",
+    "loslib.c",
+    "lparser.c",
+    "lstate.c",
+    "lstring.c",
+    "lstrlib.c",
+    "ltable.c",
+    "ltablib.c",
+    "ltm.c",
+    "lua.c",
+    "lundump.c",
+    "lutf8lib.c",
+    "lvm.c",
+    "lzio.c",
+    "-lm",
+    "-ldl"
+   ],
+   "case_id": "rw-0026",
+   "commit": "1f3c6f4534c6411313361697d98d1145a1f030fa",
+   "deny": [
+    "CVE-2022-28805"
+   ],
+   "elf": "runs/p9-screen/build/lua-1f3c6f4534c6/bin.elf",
+   "elf_sha256": "d7e25cdd694b022ab219fcfaaf4cb108b3dadbbe435251a7d64741db7ac4bc97",
+   "functions": [
+    {
+     "addr": 166512,
+     "addr_hex": "0x28a70",
+     "cu": "lparser.c",
+     "label": "good",
+     "name": "singlevar",
+     "pair": "rp-14",
+     "role": "root",
+     "size": 211
+    }
+   ],
+   "project": "lua",
+   "source_files": [
+    "lparser.c"
+   ],
+   "stripped": "runs/p9-screen/build/lua-1f3c6f4534c6/bin.stripped.elf",
+   "stripped_sha256": "d52b468344dce98605650a8c8cf1685031ae1362640ef1f3d770fab669fa9937",
+   "text": {
+    "addr": 23392,
+    "sha256": "3b7763a33812f5afd4d831fcf72b41818df4658526647464fb4d6f6db82ae299",
+    "size": 268294
+   }
   }
  ],
  "inputs": {
   "census_sha256": "ede4f488d97fa4fe280174c262668c620b4844729c5b2c6cd5a3726be2daf1a0",
+  "reserve_census_sha256": "75f9eb88e864818a9a22447a064973c9bc21d2febb6e57f15f37e308e408bc3a",
   "screen_sha256": {
    "giflib": "723ee75ab6cb0f73f35a1e59c99ed3c215b2317bf90529bc0db41ddb8dbadd42",
    "jbig2dec": "945eea27b3f4d28b52c16f4113656d0832edd20e394d1f36c5abac70c6b2f274",
+   "lua": "8971504533caf5e2d8c548737e5f7fc2e811116c4787060a55615fce8901cbb7",
    "md4c": "a30a2f8c69f4b49242f05c401be370cfa81924ef36fdb4f53eca83026eaadb03",
    "mujs": "f6826a861ba0e9140596dcfc830e0ed079047bd3b2a1c9406549fb9aa08ab13f"
   },
@@ -1646,6 +2140,96 @@
        ]
       }
      ],
+     "redactions": 0
+    }
+   }
+  },
+  {
+   "aliases": [],
+   "cve": "CVE-2020-24342",
+   "excluded_by": null,
+   "file": "ldo.c",
+   "fix": "34affe7a63fc5d842580a9f23616d057e17dfe27",
+   "pair_id": "rp-12",
+   "post": "rw-0022",
+   "post_addr": "0x17924",
+   "pre": "rw-0021",
+   "pre_addr": "0x17924",
+   "pre_commit": "a2195644d89812e5b157ce7bac35543e06db05e3",
+   "project": "lua",
+   "root": "luaD_callnoyield",
+   "s6": {
+    "pass": true,
+    "post": {
+     "closure": 240,
+     "gated": 240,
+     "leaks": [],
+     "redactions": 0
+    },
+    "pre": {
+     "closure": 240,
+     "gated": 240,
+     "leaks": [],
+     "redactions": 0
+    }
+   }
+  },
+  {
+   "aliases": [],
+   "cve": "CVE-2021-45985",
+   "excluded_by": null,
+   "file": "ldo.c",
+   "fix": "cf613cdc6fa367257fc61c256f63d917350858b5",
+   "pair_id": "rp-13",
+   "post": "rw-0024",
+   "post_addr": "0x17d6c",
+   "pre": "rw-0023",
+   "pre_addr": "0x17d6c",
+   "pre_commit": "066e0f93c4901e601d93e31fb700f8f66f95feb8",
+   "project": "lua",
+   "root": "luaD_pretailcall",
+   "s6": {
+    "pass": true,
+    "post": {
+     "closure": 257,
+     "gated": 257,
+     "leaks": [],
+     "redactions": 0
+    },
+    "pre": {
+     "closure": 257,
+     "gated": 257,
+     "leaks": [],
+     "redactions": 0
+    }
+   }
+  },
+  {
+   "aliases": [],
+   "cve": "CVE-2022-28805",
+   "excluded_by": null,
+   "file": "lparser.c",
+   "fix": "1f3c6f4534c6411313361697d98d1145a1f030fa",
+   "pair_id": "rp-14",
+   "post": "rw-0026",
+   "post_addr": "0x28a70",
+   "pre": "rw-0025",
+   "pre_addr": "0x28a70",
+   "pre_commit": "25b143dd34fb587d1e35290c4b25bc08954800e2",
+   "project": "lua",
+   "root": "singlevar",
+   "s6": {
+    "pass": true,
+    "post": {
+     "closure": 347,
+     "gated": 347,
+     "leaks": [],
+     "redactions": 0
+    },
+    "pre": {
+     "closure": 346,
+     "gated": 346,
+     "leaks": [],
      "redactions": 0
     }
    }
