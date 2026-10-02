@@ -2,12 +2,17 @@
 
 Two layers, both applied to the COMPLETE text that would be sent to a model:
 
-  static  label-shaped text that is never legitimate in a prompt: CWE ids, _bad/_good
-          identifiers, bad()/good() call forms, G2B/B2G, Juliet support tokens, io.c.
+  static  label-shaped text that is never legitimate in a prompt: CWE ids, CVE ids (Phase 9),
+          _bad/_good identifiers, bad()/good() call forms, G2B/B2G, Juliet support tokens, io.c.
           Needs no ground truth.
-  name    a per-binary denylist built from the manifest: every bad/good/support function
-          name and every source-file name/stem for that binary. `main` is allowed (every C
-          program has one; it is not a label).
+  name    a per-binary denylist built from a manifest: every bad/good/support function name, every
+          source-file name/stem for that binary, and the entry's optional "deny" list (Phase 9: the
+          CVE ids of the pairs whose roots that binary holds). `main` is allowed (every C program has
+          one; it is not a label).
+
+Manifests: the Juliet manifest (config corpus.manifest) and, once it exists, the real-code manifest
+(config real.manifest, Phase 9, D-009). A binary is looked up in every default manifest; a sha found in
+none, or in more than one, fails closed. Passing manifest_path selects exactly one manifest.
 
 Contract (D-017):
   * assert_clean() raises LeakError. There is no warn mode, no environment variable, and
@@ -18,7 +23,7 @@ Contract (D-017):
   * Phase 4 onward: every provider call passes its final prompt through assert_clean()
     before any network or cache I/O, so no code path reaches a model without it.
   * binary_sha256=None runs the static layer only -- an explicit choice for a binary with no
-    manifest entry. A sha that IS given but is absent from the manifest raises
+    manifest entry. A sha that IS given but is absent from every manifest raises
     LeakCheckConfigError: the name layer fails closed, it never silently skips.
 """
 from __future__ import annotations
@@ -31,6 +36,7 @@ from pathlib import Path
 
 STATIC_PATTERNS: dict[str, re.Pattern[str]] = {
     "cwe_id":          re.compile(r"(?i)\bcwe[-_ ]?\d+"),
+    "cve_id":          re.compile(r"(?i)\bcve[-_ ]?\d{4}[-_ ]\d{4,7}"),
     "suffix_bad_good": re.compile(r"\w+_(?:bad|good)\w*"),
     "call_form":       re.compile(r"\b(?:bad|good)(?:G2B|B2G)?\d*\s*\("),
     "g2b_b2g":         re.compile(r"(?:G2B|B2G)\d*\b"),
@@ -65,7 +71,7 @@ class LeakError(RuntimeError):
 
 
 class LeakCheckConfigError(RuntimeError):
-    """The name layer cannot be built (unknown binary, empty denylist). Fails closed."""
+    """The name layer cannot be built (unknown binary, ambiguous binary, empty denylist). Fails closed."""
 
 
 def _context(text: str, m: re.Match[str]) -> str:
@@ -74,28 +80,39 @@ def _context(text: str, m: re.Match[str]) -> str:
     return text[s: e if e != -1 else len(text)].strip()[:120]
 
 
-def _default_manifest() -> str:
+def _default_manifests() -> tuple[str, ...]:
+    """The Juliet manifest, plus the real-code manifest once it exists (Phase 9)."""
     from taintwalk.config import REPO_ROOT, load_config
-    return str(REPO_ROOT / load_config()["corpus"]["manifest"])
+    cfg = load_config()
+    paths = [str(REPO_ROOT / cfg["corpus"]["manifest"])]
+    real = (cfg.get("real") or {}).get("manifest")
+    if real and (REPO_ROOT / real).is_file():
+        paths.append(str(REPO_ROOT / real))
+    return tuple(paths)
 
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=8)
 def _manifest_index(manifest_path: str) -> dict[str, dict]:
     data = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
     return {e["stripped_sha256"]: e for e in data["entries"]}
 
 
 @lru_cache(maxsize=1024)
-def _name_rx(binary_sha256: str, manifest_path: str) -> re.Pattern[str]:
-    entry = _manifest_index(manifest_path).get(binary_sha256)
-    if entry is None:
+def _name_rx(binary_sha256: str, manifest_paths: tuple[str, ...]) -> re.Pattern[str]:
+    hits = [p for p in manifest_paths if binary_sha256 in _manifest_index(p)]
+    if not hits:
         raise LeakCheckConfigError(
-            f"binary sha256 {binary_sha256[:12]}... is not in {manifest_path}; "
+            f"binary sha256 {binary_sha256[:12]}... is in none of {list(manifest_paths)}; "
             "refusing to run the name layer blind")
+    if len(hits) > 1:
+        raise LeakCheckConfigError(
+            f"binary sha256 {binary_sha256[:12]}... is in {len(hits)} manifests {hits}; ambiguous")
+    entry = _manifest_index(hits[0])[binary_sha256]
     names = {f["name"] for f in entry["functions"] if f["label"] in NAME_LABELS}
     for s in entry["source_files"]:
         names.add(Path(s).stem)
         names.add(Path(s).name)
+    names.update(entry.get("deny", []))
     names = {n for n in names if n} - NAME_ALLOW
     if not names:
         raise LeakCheckConfigError(f"{entry['case_id']}: empty name denylist")
@@ -112,7 +129,8 @@ def scan(text: str, binary_sha256: str | None = None, *,
         for m in rx.finditer(text):
             findings.append(Finding("static", pname, m.group(0), _context(text, m)))
     if binary_sha256 is not None:
-        rx = _name_rx(binary_sha256, str(manifest_path or _default_manifest()))
+        paths = _default_manifests() if manifest_path is None else (str(manifest_path),)
+        rx = _name_rx(binary_sha256, paths)
         for m in rx.finditer(text):
             findings.append(Finding("name", "manifest", m.group(0), _context(text, m)))
     return findings

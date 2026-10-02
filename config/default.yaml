@@ -56,3 +56,7 @@ walk:
   out_dir: runs/p6-walk                 # default --run-dir for `taintwalk walk`
   callee_context_max_chars: 12000       # test: system + user + this cap <= 28,544-char preflight budget
   scc_max_iterations: 3                 # fixed-point cap for recursive components
+
+# Phase 9 real-code corpus (D-009). Ground truth: read by the eval side and the leak gate only.
+real:
+  manifest: corpus/real/manifest.json

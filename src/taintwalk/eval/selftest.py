@@ -177,7 +177,7 @@ def run_leak_selftest(programs_dir: Path, manifest_path: Path | None = None) -> 
             ctx = render_callee_context((f"  {name}(1);",),
                                         [CalleeView("0x1", name, "ok", summary=json.loads(s_json))],
                                         max_chars=cap)
-            assert_clean(ctx.text, sha, manifest_path=mp)
+            assert_clean(ctx.text, sha, manifest_path=manifest_path)   # None: Juliet + real-code manifests (Phase 9)
         except LeakError as exc:
             callee_leaks.append(f"{sha[:12]} {name} rendered summary\n{exc}")
         except (LeakCheckConfigError, ValidationError, ValueError) as exc:
