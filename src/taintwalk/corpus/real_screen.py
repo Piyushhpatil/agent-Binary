@@ -81,11 +81,21 @@ def recipe_mujs(tree: Path) -> tuple[list[str], list[str], list[str]]:
     return _rel(tree, files), [], ["-lm"]
 
 
+MD_VERSION = re.compile(r"set\s*\(\s*MD_VERSION_(MAJOR|MINOR|RELEASE)\s+(\d+)\s*\)")
+
+
 def recipe_md4c(tree: Path) -> tuple[list[str], list[str], list[str]]:
-    """The library plus the md2html program. The library moved from md4c/ to src/ in 2019."""
+    """The library plus the md2html program. The library moved from md4c/ to src/ in 2019; from then
+    on md2html prints a version CMake defines, so the src/ layout gets MD_VERSION_* from CMakeLists.txt
+    (0 when absent). Validated on md4c's head; the md4c/ layout of every candidate is unchanged."""
     lib = "md4c" if (tree / "md4c" / "md4c.c").exists() else "src"
     files = [p for d in (lib, "md2html") for p in (tree / d).glob("*.c")]
-    return _rel(tree, files), [f"-I{lib}", "-Imd2html"], []
+    flags = [f"-I{lib}", "-Imd2html"]
+    if lib == "src":
+        cm = tree / "CMakeLists.txt"
+        found = dict(MD_VERSION.findall(cm.read_text(encoding="utf-8", errors="replace"))) if cm.exists() else {}
+        flags += [f"-DMD_VERSION_{k}={found.get(k, '0')}" for k in ("MAJOR", "MINOR", "RELEASE")]
+    return _rel(tree, files), flags, []
 
 
 GIF_LIB = ("dgif_lib.c", "egif_lib.c", "gifalloc.c", "gif_err.c", "gif_font.c", "gif_hash.c",
