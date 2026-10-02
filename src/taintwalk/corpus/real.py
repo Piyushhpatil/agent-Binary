@@ -38,7 +38,7 @@ from typing import Any
 
 from taintwalk.config import REPO_ROOT
 
-CENSUS_VERSION = 1
+CENSUS_VERSION = 2                  # 2: s7_commits on every project-matched row (D-037)
 SEED = 20261001
 PER_PROJECT_CAP = 5
 MIN_PAIRS = 10                      # below this, the Lua reserve is triggered (pre-registered)
@@ -341,6 +341,9 @@ def rows_for_project(name: str, repo: Repo, nvd_doc: dict[str, Any], gh_dir: Pat
             rows.append(row)
             continue
         row["project_match"] = match
+        # D-037 S7 needs every matched CVE's fix commits, whatever its scope.
+        s7 = resolve(repo, cid, refs, gh, gh_dir, fetch)
+        row["s7_commits"] = s7["commits"]
 
         adv = signal(cwes, desc)
         row["advisory_signal"] = {"verdict": adv[0], "evidence": adv[1]}
@@ -355,7 +358,7 @@ def rows_for_project(name: str, repo: Repo, nvd_doc: dict[str, Any], gh_dir: Pat
             rows.append(row)
             continue
 
-        res = resolve(repo, cid, refs, gh, gh_dir, fetch)
+        res = s7                                # the same resolution, computed once
         row.update(res)
         if res["resolution"] != "unique":
             row["exclusion"] = f"fix commit {res['resolution']}"
