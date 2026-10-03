@@ -431,3 +431,27 @@ pairs survive the screens.
 4. **Lua's pairs and binaries are numbered after the existing ones**, so no committed pair or binary changes.
 5. **If the corpus is still below 10 pairs afterwards, it stays as it is** and the shortfall is disclosed. No
    other project may be added.
+
+## Deviation D-040 (2026-10-03, during the live run, before any real-code verdict was read)
+
+**Reason:** the scorer needs rules the Phase 9 text leaves open. They are fixed here, in git, before anyone
+reads a real-code verdict. When this was written, R4 rows existed for the roots and the walk was running;
+the only model output displayed was run status, token counts and one R4 failure (`max_tokens`, no summary).
+
+1. **The judge.** D-008's primary rule at the root, detection level only. A root is flagged when its row
+   says vulnerable, clear when it says not vulnerable, and abstains when there is no summary. The cells are
+   Phase 8's own (`eval/metrics._cell`): an abstaining pre-fix root counts against recall (FN_abstain) and an
+   abstaining post-fix root is never a TN. No mechanism match is required; D-038 drops the typed ladder.
+2. **A fifth pair outcome.** A pair where either root abstained is "abstained". It is never pair-correct,
+   and it is reported beside the four pre-registered outcomes.
+3. **Checks that fail the run.** Every root of every included pair has a row in R1-R5. R4 and R5 come from
+   the same provider and prompt version. At every root whose walk prompt had no callee block, the R4 and R5
+   rows are identical (D-038 item 4). Pairs with no callee block at either root are shown apart.
+4. **Abstention reasons** at the roots are counted per LLM rung under the pipeline's own names. Output
+   truncated at the frozen 2,048-token limit (`max_tokens`) is an abstention like a context overflow
+   (failure mode 3), counted under its own name and never recoded.
+5. **Literal gain** is the set of string literals in the post-fix root's pseudo-C that the pre-fix root's
+   pseudo-C lacks. Reported: how many post-fix roots gained one, and their outcomes per rung.
+6. **Entry point:** `python -m taintwalk.eval.real_score`, CPU only and model-free. It writes
+   `runs/p9-real/eval/real.json`, byte-identical on unchanged input, and splices a marked Phase 9 section
+   into `docs/RESULTS.md`. The gap table reads Phase 8's `runs/p8-eval/scores/R1.json`..`R5.json` unchanged.
