@@ -455,3 +455,15 @@ the only model output displayed was run status, token counts and one R4 failure 
 6. **Entry point:** `python -m taintwalk.eval.real_score`, CPU only and model-free. It writes
    `runs/p9-real/eval/real.json`, byte-identical on unchanged input, and splices a marked Phase 9 section
    into `docs/RESULTS.md`. The gap table reads Phase 8's `runs/p8-eval/scores/R1.json`..`R5.json` unchanged.
+
+## Deviation D-041 (2026-10-05, after the live run, before any replay of it)
+
+**Reason:** a context overflow is never cached (D-022), and offline mode raised OfflineMiss at the cache miss,
+before the preflight ran. An offline replay of a run with overflows therefore stopped instead of reproducing
+them, so Phase 8's replay check could not be applied to the Phase 9 walks.
+
+**Fix:** in offline mode the local preflight (a character count, no I/O) runs before the miss is raised. A
+prompt it rejects raises ContextOverflow and is recorded exactly as on the live path. The live path, the
+prompts, the cache keys and every stored result are unchanged, and no real-code result is re-run. This is
+complete because every Phase 9 overflow came from the preflight (checked: no row records the post-check).
+Phase 8's offline replay is re-run as the regression check.

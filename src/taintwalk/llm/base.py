@@ -28,8 +28,10 @@ accounting never drops a partial call (D-032). Only the exception's type name is
 recorded, never its message.
 
 Offline mode (replay only, D-032): a cache miss raises OfflineMiss right after the cache
-lookup, before preflight or any network I/O. A replay is then free by construction,
-not merely because a token count happened to come back zero.
+lookup and the local preflight, before any network I/O. A replay is then free by construction,
+not merely because a token count happened to come back zero. A prompt the preflight rejects
+raises ContextOverflow and is recorded exactly as it was live (D-041): an overflow is never
+cached, so a replay has to re-derive it.
 
 A LeakError is never caught here. Its message holds ground-truth text; it must not
 reach a prompt, the repair loop, the cache, or a log line.
@@ -289,8 +291,19 @@ class LLMProvider(ABC):
                 self.records.append(hit.record(time.monotonic() - t0))
                 return hit
 
-        # 2b. Offline mode (replay only, D-032): a miss stops here, before preflight or any I/O.
+        # 2b. Offline mode (replay only, D-032): a miss stops here, before any network I/O. The local
+        #     preflight runs first (D-041): an overflow is never cached, so without it a live run's
+        #     overflow could not replay. It is recorded exactly as the live path records it.
         if self.offline:
+            try:
+                self._preflight(system, user)
+            except ContextOverflow:
+                self.records.append({
+                    "key": key, "provider": self.name, "model": self.model, "status": "raised",
+                    "failure": "ContextOverflow", "cache_hit": False, "repaired": False, "attempts": 0,
+                    "usage": asdict(Usage()), "wall_s": round(time.monotonic() - t0, 3),
+                })
+                raise
             raise OfflineMiss(f"{self.name}/{self.model}: no cached reply for key {key[:16]}")
 
         # 3. Send, validate, repair at most REPAIR_LIMIT times. A raised LLMError is recorded
