@@ -316,6 +316,8 @@ REPORTABLE: Phase 9 held-out real-code result (pre-registered, D-036; scorer D-0
 
 12 pairs (giflib 2, lua 3, md4c 3, mujs 4), 24 roots; unit: the pair; root: the function the fix changed (D-008 as amended). Judge: D-008 primary cells at the root, detection level (D-040). 95% Wilson intervals; no p-values (pre-registered).
 
+Gap analysis: every R5 error at a root is coded in `docs/GAP-ANALYSIS.md` (AI-assisted, author-reviewed, D-035).
+
 ### Every rung at the roots
 
 | rung | roots | TP | FN | FN_abs | FP | TN | abstain | precision | recall | specificity | coverage | F1 |

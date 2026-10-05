@@ -344,7 +344,9 @@ def render(score: dict[str, Any], *, status: str, md: bool) -> list[str]:
     out = [f"{head}Phase 9: real-code generalization (held out)", "", status, "",
            f"{c['pairs']} pairs ({', '.join(f'{k} {v}' for k, v in c['projects'].items())}), {c['roots']} roots; "
            f"unit: the pair; root: the function the fix changed (D-008 as amended). Judge: D-008 primary cells at the "
-           f"root, detection level (D-040). 95% Wilson intervals; no p-values (pre-registered)."]
+           f"root, detection level (D-040). 95% Wilson intervals; no p-values (pre-registered).",
+           "", "Gap analysis: every R5 error at a root is coded in `docs/GAP-ANALYSIS.md` (AI-assisted, "
+           "author-reviewed, D-035)."]
 
     def section(title: str, intro: str | None, header: list[str], rows: list[list[Any]]) -> None:
         out.extend(["", f"{sub}{title}"])
