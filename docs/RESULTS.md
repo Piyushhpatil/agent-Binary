@@ -308,3 +308,132 @@ Seen during development and kept in the corpus: tw-0015, tw-0022, tw-0065, tw-00
 - `rand()` counts as an input source (Juliet's convention, the prompt's, and R2's list).
 - CWE-78, 134 and 606 are effectively char-only: their wchar_t variants did not compile (D-013).
 - Flow 44's function pointers resolve to call edges at -O0; an unresolved computed call would give no edge.
+
+<!-- phase9:begin -->
+## Phase 9: real-code generalization (held out)
+
+REPORTABLE: Phase 9 held-out real-code result (pre-registered, D-036; scorer D-040). Descriptive only; never pooled with Juliet.
+
+12 pairs (giflib 2, lua 3, md4c 3, mujs 4), 24 roots; unit: the pair; root: the function the fix changed (D-008 as amended). Judge: D-008 primary cells at the root, detection level (D-040). 95% Wilson intervals; no p-values (pre-registered).
+
+### Every rung at the roots
+
+| rung | roots | TP | FN | FN_abs | FP | TN | abstain | precision | recall | specificity | coverage | F1 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| R1 | 24 | 2 | 10 | 0 | 2 | 10 | 0 | 0.500 [0.150,0.850] 2/4 | 0.167 [0.047,0.448] 2/12 | 0.833 [0.552,0.953] 10/12 | 1.000 [0.862,1.000] 24/24 | 0.250 |
+| R2 | 24 | 0 | 12 | 0 | 0 | 12 | 0 | - | 0.000 [0.000,0.242] 0/12 | 1.000 [0.758,1.000] 12/12 | 1.000 [0.862,1.000] 24/24 | - |
+| R3 | 24 | 7 | 5 | 0 | 7 | 5 | 0 | 0.500 [0.268,0.732] 7/14 | 0.583 [0.320,0.807] 7/12 | 0.417 [0.193,0.680] 5/12 | 1.000 [0.862,1.000] 24/24 | 0.538 |
+| R4 | 24 | 10 | 0 | 2 | 9 | 0 | 3 | 0.526 [0.317,0.727] 10/19 | 0.833 [0.552,0.953] 10/12 | 0.000 [0.000,0.242] 0/12 | 0.792 [0.595,0.908] 19/24 | 0.645 |
+| R5 | 24 | 8 | 0 | 4 | 8 | 0 | 4 | 0.500 [0.280,0.720] 8/16 | 0.667 [0.391,0.862] 8/12 | 0.000 [0.000,0.242] 0/12 | 0.667 [0.467,0.820] 16/24 | 0.571 |
+
+### Pair outcomes
+
+| rung | pairs | pair-correct | both vulnerable | both clear | reversed | abstained | pair-correct rate | both-vulnerable rate |
+|---|---|---|---|---|---|---|---|---|
+| R1 | 12 | 0 | 2 | 10 | 0 | 0 | 0.000 [0.000,0.242] 0/12 | 0.167 [0.047,0.448] 2/12 |
+| R2 | 12 | 0 | 0 | 12 | 0 | 0 | 0.000 [0.000,0.242] 0/12 | 0.000 [0.000,0.242] 0/12 |
+| R3 | 12 | 0 | 7 | 5 | 0 | 0 | 0.000 [0.000,0.242] 0/12 | 0.583 [0.320,0.807] 7/12 |
+| R4 | 12 | 0 | 9 | 0 | 0 | 3 | 0.000 [0.000,0.242] 0/12 | 0.750 [0.468,0.911] 9/12 |
+| R5 | 12 | 0 | 7 | 0 | 0 | 5 | 0.000 [0.000,0.242] 0/12 | 0.583 [0.320,0.807] 7/12 |
+
+### Pair outcomes: roots with a callee block
+
+| rung | pairs | pair-correct | both vulnerable | both clear | reversed | abstained | pair-correct rate | both-vulnerable rate |
+|---|---|---|---|---|---|---|---|---|
+| R1 | 9 | 0 | 1 | 8 | 0 | 0 | 0.000 [0.000,0.299] 0/9 | 0.111 [0.020,0.435] 1/9 |
+| R2 | 9 | 0 | 0 | 9 | 0 | 0 | 0.000 [0.000,0.299] 0/9 | 0.000 [0.000,0.299] 0/9 |
+| R3 | 9 | 0 | 6 | 3 | 0 | 0 | 0.000 [0.000,0.299] 0/9 | 0.667 [0.354,0.879] 6/9 |
+| R4 | 9 | 0 | 6 | 0 | 0 | 3 | 0.000 [0.000,0.299] 0/9 | 0.667 [0.354,0.879] 6/9 |
+| R5 | 9 | 0 | 4 | 0 | 0 | 5 | 0.000 [0.000,0.299] 0/9 | 0.444 [0.189,0.733] 4/9 |
+
+### Pair outcomes: no callee block at either root (R4 and R5 saw the same prompts)
+
+| rung | pairs | pair-correct | both vulnerable | both clear | reversed | abstained | pair-correct rate | both-vulnerable rate |
+|---|---|---|---|---|---|---|---|---|
+| R1 | 3 | 0 | 1 | 2 | 0 | 0 | 0.000 [0.000,0.561] 0/3 | 0.333 [0.061,0.792] 1/3 |
+| R2 | 3 | 0 | 0 | 3 | 0 | 0 | 0.000 [0.000,0.561] 0/3 | 0.000 [0.000,0.561] 0/3 |
+| R3 | 3 | 0 | 1 | 2 | 0 | 0 | 0.000 [0.000,0.561] 0/3 | 0.333 [0.061,0.792] 1/3 |
+| R4 | 3 | 0 | 3 | 0 | 0 | 0 | 0.000 [0.000,0.561] 0/3 | 1.000 [0.439,1.000] 3/3 |
+| R5 | 3 | 0 | 3 | 0 | 0 | 0 | 0.000 [0.000,0.561] 0/3 | 1.000 [0.439,1.000] 3/3 |
+
+### Gap against Phase 8 (Juliet, pooled, primary)
+
+Recall and specificity do not depend on the positive rate. Delta = Phase 9 minus Phase 8.
+
+| rung | recall P8 | recall P9 | delta | specificity P8 | specificity P9 | delta |
+|---|---|---|---|---|---|---|
+| R1 | 0.617 [0.554,0.676] 148/240 | 0.167 [0.047,0.448] 2/12 | -0.450 | 0.598 [0.549,0.646] 237/396 | 0.833 [0.552,0.953] 10/12 | +0.235 |
+| R2 | 0.713 [0.652,0.766] 171/240 | 0.000 [0.000,0.242] 0/12 | -0.713 | 0.649 [0.601,0.694] 257/396 | 1.000 [0.758,1.000] 12/12 | +0.351 |
+| R3 | 0.775 [0.718,0.823] 186/240 | 0.583 [0.320,0.807] 7/12 | -0.192 | 0.455 [0.406,0.504] 180/396 | 0.417 [0.193,0.680] 5/12 | -0.038 |
+| R4 | 0.554 [0.491,0.616] 133/240 | 0.833 [0.552,0.953] 10/12 | +0.279 | 0.674 [0.627,0.719] 267/396 | 0.000 [0.000,0.242] 0/12 | -0.674 |
+| R5 | 0.821 [0.767,0.864] 197/240 | 0.667 [0.391,0.862] 8/12 | -0.154 | 0.477 [0.429,0.526] 189/396 | 0.000 [0.000,0.242] 0/12 | -0.477 |
+
+### Precision and F1, with the base rate
+
+Base rate: Phase 8 roots are 0.377 [0.341,0.416] 240/636 positive; this corpus is 0.500 [0.314,0.686] 12/24 by construction. Neither resembles real code, so precision and F1 do not transfer between them.
+
+| rung | precision P8 | precision P9 | F1 P8 | F1 P9 |
+|---|---|---|---|---|
+| R1 | 0.482 [0.427,0.538] 148/307 | 0.500 [0.150,0.850] 2/4 | 0.541 | 0.250 |
+| R2 | 0.552 [0.496,0.606] 171/310 | - | 0.622 | - |
+| R3 | 0.463 [0.415,0.512] 186/402 | 0.500 [0.268,0.732] 7/14 | 0.579 | 0.538 |
+| R4 | 0.512 [0.451,0.572] 133/260 | 0.526 [0.317,0.727] 10/19 | 0.532 | 0.645 |
+| R5 | 0.488 [0.439,0.536] 197/404 | 0.500 [0.280,0.720] 8/16 | 0.612 | 0.571 |
+
+### Why roots abstained
+
+| rung | reason | roots |
+|---|---|---|
+| R4 | max_tokens | 5 |
+| R5 | max_tokens | 8 |
+
+### Post-fix literal gain (the D-018 shortcut on real code)
+
+0 of 12 post-fix roots gained a string literal the pre-fix root lacked. Outcomes at those post-fix roots:
+
+| rung | flagged | clear | abstain |
+|---|---|---|---|
+| R1 | 0 | 0 | 0 |
+| R2 | 0 | 0 | 0 |
+| R3 | 0 | 0 | 0 |
+| R4 | 0 | 0 | 0 |
+| R5 | 0 | 0 | 0 |
+
+### Root closures and indirect calls (failure mode 5)
+
+12 of 24 roots reach an indirect call site; 116 sites summed over the root closures.
+
+| pair | function | closure pre | closure post | indirect pre | indirect post |
+|---|---|---|---|---|---|
+| rp-01 | Fp_toString | 364 | 364 | 10 | 10 |
+| rp-02 | jsR_setproperty | 364 | 364 | 18 | 18 |
+| rp-03 | MakeDay | 7 | 7 | 0 | 0 |
+| rp-04 | js_strtod | 1 | 1 | 0 | 0 |
+| rp-05 | md_split_simple_pairing_mark | 1 | 1 | 0 | 0 |
+| rp-06 | md_is_named_entity_contents | 1 | 1 | 0 | 0 |
+| rp-07 | md_is_link_label | 2 | 2 | 0 | 0 |
+| rp-08 | DGifDecompressLine | 4 | 4 | 2 | 2 |
+| rp-10 | EGifGCBToSavedExtension | 4 | 4 | 0 | 0 |
+| rp-12 | luaD_callnoyield | 240 | 240 | 9 | 9 |
+| rp-13 | luaD_pretailcall | 257 | 257 | 9 | 9 |
+| rp-14 | singlevar | 346 | 347 | 10 | 10 |
+
+### Every pair
+
+Pre/post outcome per rung: F flagged, C clear, A abstained.
+
+| pair | CVE | project | function | no callee | R1 | R2 | R3 | R4 | R5 |
+|---|---|---|---|---|---|---|---|---|---|
+| rp-01 | CVE-2016-7564 | mujs | Fp_toString |  | F/F | C/C | F/F | F/F | F/F |
+| rp-02 | CVE-2017-5627 | mujs | jsR_setproperty |  | C/C | C/C | F/F | A/A | F/A |
+| rp-03 | CVE-2017-5628 | mujs | MakeDay |  | C/C | C/C | C/C | F/F | F/F |
+| rp-04 | CVE-2021-33797 | mujs | js_strtod | yes | C/C | C/C | C/C | F/F | F/F |
+| rp-05 | CVE-2018-11536 | md4c | md_split_simple_pairing_mark | yes | F/F | C/C | F/F | F/F | F/F |
+| rp-06 | CVE-2018-11546 | md4c | md_is_named_entity_contents | yes | C/C | C/C | C/C | F/F | F/F |
+| rp-07 | CVE-2018-11547 | md4c | md_is_link_label |  | C/C | C/C | C/C | F/A | A/A |
+| rp-08 | CVE-2018-11490 | giflib | DGifDecompressLine |  | C/C | C/C | C/C | F/F | A/A |
+| rp-10 | CVE-2026-26740 | giflib | EGifGCBToSavedExtension |  | C/C | C/C | F/F | F/F | F/F |
+| rp-12 | CVE-2020-24342 | lua | luaD_callnoyield |  | C/C | C/C | F/F | F/F | F/F |
+| rp-13 | CVE-2021-45985 | lua | luaD_pretailcall |  | C/C | C/C | F/F | A/A | A/A |
+| rp-14 | CVE-2022-28805 | lua | singlevar |  | C/C | C/C | F/F | F/F | A/F |
+<!-- phase9:end -->
