@@ -467,3 +467,78 @@ prompt it rejects raises ContextOverflow and is recorded exactly as on the live 
 prompts, the cache keys and every stored result are unchanged, and no real-code result is re-run. This is
 complete because every Phase 9 overflow came from the preflight (checked: no row records the post-check).
 Phase 8's offline replay is re-run as the regression check.
+
+<!-- phase10-prereg -->
+## Phase 10: agentic evidence gathering (pre-registered 2026-10-06, before any agent code; D-042)
+
+Committed before `analysis/agent.py` exists. Every later change is a numbered deviation below,
+committed before the data it governs.
+
+### Question
+Does letting the model choose which callee code and summaries to read change root verdicts, compared
+with no evidence (R4), a scripted read of every direct callee (A1), and the fixed bottom-up walk (R5)?
+
+### Disclosure
+The Phase 8 and Phase 9 results were known when this was designed (Phase 9: pair-correct 0/12 on every
+rung). The Juliet corpus and the Phase 9 pairs are development data for any new pipeline, so no
+generalization claim is made from them. Fresh held-out pairs are future work.
+
+### Rungs (one judge for all)
+- R4: no evidence. Unchanged from Phase 8 (`runs/p8-local`) and Phase 9 (`runs/p9-real/r4`).
+- A1, scripted policy: read the no-context summary of every direct in-scope callee, in address order,
+  then stop. No model call chooses anything.
+- A2, model policy: up to 8 actions chosen by the model from list_callees, read_code, read_summary, finish.
+- R5: the fixed walk. Unchanged from Phases 8 and 9.
+
+The A1 and A2 verdicts come from the frozen prompt-v2 judge: `build_prompt(root, callee_context=<evidence>)`.
+The evidence block is the only input that differs from R4. A root with an empty evidence block must
+reproduce its R4 row exactly; the scorer fails closed otherwise.
+
+### Actions
+Each step is one constrained-JSON completion `{reason, action, target}` through `LLMProvider.complete()`,
+so every step passes the leak gate, disk cache, preflight, single repair and usage record (D-019) and
+replays byte for byte (I2). Spike (`runs/p10-spike/m2-spike.json`; hand-written synthetic functions, no
+corpus data): 3/3 schema-valid, 3/3 valid targets. Ollama native tool calling also returned a well-formed
+call. It is not used, by design: one pipeline, one cache-key format and one replay path for every step,
+and no second provider method.
+
+### Tools (label-free, scoped to the root's downward closure, D-036)
+- list_callees(addr): internal callees by address, each readable, no_code or out_of_scope.
+- read_code(addr): pseudo-C prepared as the judge prepares it (literal redaction, zero-fill collapse),
+  unnumbered so it cannot shift evidence_line, cut at whole lines at 4,000 characters.
+- read_summary(addr): the callee's no-context summary, i.e. the R4 prompt, rendered by the D-026 renderer.
+- finish.
+
+The root itself is never a read target. Invalid actions (outside the scope, the root, a repeat) cost a
+step and are counted.
+
+### Caps (hard; values fixed at the freeze)
+- Per root: 8 actions (finish included), 20 model calls, 150,000 metered tokens.
+- Metered tokens = ceil(characters / 2.0) over every prompt and reply, cache hits included, so a replay
+  gets exactly the live run's budget.
+- Per run: a metered-token ceiling, set at the freeze from the development run.
+- Gathering stops at finish, at a cap, at a step prompt over the preflight budget, or at a failed step.
+  The judge then runs on what was gathered. A failed judge is an abstention named by its failure; a
+  budget too small for the judge is the abstention `agent:budget`.
+
+### Data
+- Development: the 13 Juliet binaries used in Phase 7 (the 12 shakedown binaries and tw-0015). The step
+  prompt, the evidence rendering and the cap values may change only here, before the tag `p10-freeze`.
+  The judge, the tools' contract, the scoring rules and the data split never change.
+- Scored: the path roots of the other 227 Juliet binaries, and the 24 Phase 9 roots. Roots reach the
+  analysis side as address lists, numerically sorted.
+- Runtime rule: if the development run projects more than 24 h per policy for the scored Juliet set, a
+  seeded subsample of binaries (seed 20261006) is scored instead, fixed and committed before any scored run.
+
+### Statistics
+- Juliet: the D-008 primary cell and typed ladder at the path roots. Exact two-sided McNemar on bad roots
+  and on good roots for A2 vs R5, A2 vs A1 and A2 vs R4: 6 tests, Holm at family-wise 0.05. Abstentions
+  count as incorrect.
+- Real code: D-040 pair outcomes, descriptive only.
+- Also reported:
+  - per root, metered and real tokens and model time (median, p90, max), both in full and beyond R4;
+  - from the transcripts: action counts, stop reasons, invalid and repeated actions.
+- The scorer's rules are committed before any scored verdict exists.
+
+### Deviations
+None yet.
