@@ -450,3 +450,122 @@ def run_agent(provider: LLMProvider, prog: dict[str, Any], addr: str, run_dir: P
         json.dumps(transcript, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
     return row
+
+
+# ---------------------------------------------------------------------------
+# Program driver (mini-step 8): the agent at every root of one program, written
+# into a run dir shaped like the walk's so one scorer can read both.
+# ---------------------------------------------------------------------------
+
+POLICIES = ("llm", "scripted")
+
+
+def make_policy(name: str, provider: LLMProvider) -> Any:
+    """One of the two policies by name. ScriptedPolicy makes no model call of its own."""
+    if name == "scripted":
+        return ScriptedPolicy()
+    if name == "llm":
+        return LLMPolicy(provider=provider)
+    raise ValueError(f"unknown agent policy {name!r}; expected one of {POLICIES}")
+
+
+def _fn_name(prog: dict[str, Any], addr: str) -> str:
+    for f in prog["functions"]:
+        if f["addr"] == addr:
+            return f.get("ghidra_name") or addr
+    return addr
+
+
+def walk_agent_program(provider: LLMProvider, prog: dict[str, Any], run_dir: Path,
+                       roots: Iterable[str], *, policy_name: str = "llm",
+                       caps: Caps | None = None, retry_failed: bool = False) -> dict[str, Any]:
+    """Run the agent at each root, then write summaries.json and agent.json under run_dir.
+
+    summaries.json carries the walk's shape, {addr: record or null}, so a root that abstained is a
+    null entry exactly as in a fixed walk and D-008 scores it as an abstention, never as "not
+    vulnerable". Roots run in numeric address order, which carries no label (D-036)."""
+    from taintwalk.analysis.callgraph import addr_key
+
+    run_dir = Path(run_dir)
+    caps = caps or Caps.from_config()
+    if policy_name not in POLICIES:
+        raise ValueError(f"unknown agent policy {policy_name!r}; expected one of {POLICIES}")
+    sha = prog["binary"]["sha256"]
+    order = sorted(set(roots), key=addr_key)
+    if not order:
+        raise ValueError("agent mode needs at least one root address")
+    in_scope = {f["addr"] for f in prog["functions"] if f.get("in_scope")}
+    missing = [a for a in order if a not in in_scope]
+    if missing:
+        raise ValueError(f"roots not in scope in this program: {missing}")
+
+    summaries: dict[str, Any] = {}
+    functions: dict[str, Any] = {}
+    overflows = 0
+    for addr in order:
+        try:
+            row = run_agent(provider, prog, addr, run_dir,
+                            policy=make_policy(policy_name, provider),
+                            caps=caps, retry_failed=retry_failed)
+        except ContextOverflow as e:
+            overflows += 1
+            row = _abstention_row(prog, addr, _fn_name(prog, addr), "context_overflow",
+                                  {"agent": {"policy": policy_name, "stop": "preflight_overflow",
+                                             "steps": 0, "calls": 0, "metered_tokens": 0,
+                                             "judge": "context_overflow", "detail": str(e)[:200]}})
+        summaries[addr] = row.get("record")
+        a = row.get("agent") or {}
+        functions[addr] = {
+            "function": row.get("function") or _fn_name(prog, addr),
+            "status": row.get("status"), "failure": row.get("failure") or "",
+            "cache_hit": bool(row.get("cache_hit")),
+            "policy": a.get("policy", policy_name), "stop": a.get("stop", ""),
+            "steps": a.get("steps", 0), "calls": a.get("calls", 0),
+            "metered_tokens": a.get("metered_tokens", 0),
+            "invalid_actions": a.get("invalid_actions", 0),
+            "repeated_actions": a.get("repeated_actions", 0),
+            "summaries_fetched": a.get("summaries_fetched", []),
+            "code_read": a.get("code_read", []),
+            "evidence_chars": a.get("evidence_chars", 0),
+            "judge": a.get("judge", ""),
+        }
+
+    result = {
+        "binary_sha256": sha,
+        "mode": "agent",
+        "policy": policy_name,
+        "agent_prompt_version": AGENT_PROMPT_VERSION,
+        "caps": {"max_actions": caps.max_actions, "max_calls": caps.max_calls,
+                 "max_tokens_per_root": caps.max_tokens_per_root,
+                 "read_code_max_chars": caps.read_code_max_chars,
+                 "evidence_max_chars": caps.evidence_max_chars,
+                 "token_chars_ratio": caps.token_chars_ratio},
+        "roots": order,
+        "functions": functions,
+        "context_overflows": overflows,
+        "calls": sum(f["calls"] for f in functions.values()),
+        "metered_tokens": sum(f["metered_tokens"] for f in functions.values()),
+    }
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "summaries.json").write_text(
+        json.dumps(summaries, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    (run_dir / "agent.json").write_text(
+        json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return result
+
+
+def agent_report(result: dict[str, Any]) -> int:
+    """One summary line. 0 only if every root has an entry and nothing overflowed, which is
+    walk_report's rule (D-026 amendment), so both modes report success the same way."""
+    fns = result["functions"]
+    answered = sum(1 for f in fns.values() if f["judge"] == "ok")
+    stops: dict[str, int] = {}
+    for f in fns.values():
+        stops[f["stop"] or "none"] = stops.get(f["stop"] or "none", 0) + 1
+    print(f"roots {len(fns)}  answered {answered}  policy {result['policy']}  "
+          f"calls {result['calls']}  metered {result['metered_tokens']}  "
+          f"overflows {result['context_overflows']}")
+    print("stops: " + ", ".join(f"{k} {v}" for k, v in sorted(stops.items())))
+    ok = result["context_overflows"] == 0 and len(fns) == len(result["roots"])
+    print("AGENT OK" if ok else "AGENT FAIL")
+    return 0 if ok else 1

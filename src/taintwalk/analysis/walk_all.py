@@ -124,12 +124,15 @@ def read_roots(src: Path) -> dict[str, tuple[str, ...]]:
 def walk_command(program: Path, run_dir: Path, *, provider: str | None = None,
                  providers_config: Path | None = None, with_baseline: bool = False,
                  offline: bool = False, no_cache: bool = False,
-                 retry_failed: bool = False, roots: tuple[str, ...] | None = None) -> list[str]:
+                 retry_failed: bool = False, roots: tuple[str, ...] | None = None,
+                 mode: str = "fixed", policy: str = "llm") -> list[str]:
     """The single-program command, exactly as a person would type it."""
     cmd = [sys.executable, "-m", "taintwalk.cli", "walk",
            "--program", str(program), "--run-dir", str(run_dir)]
     if roots:
         cmd += ["--roots", ",".join(roots)]
+    if mode and mode != "fixed":                # fixed mode's command stays byte-identical (I2)
+        cmd += ["--mode", mode, "--policy", policy]
     if provider:
         cmd += ["--provider", provider]
     if providers_config:

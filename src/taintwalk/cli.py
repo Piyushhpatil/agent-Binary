@@ -242,11 +242,13 @@ def _cmd_walk(args: argparse.Namespace) -> int:
             print("--all needs --programs LIST|DIR and --run-dir ROOT", file=sys.stderr)
             return 2
         from taintwalk.analysis.walk_all import run_walk_all
+        agent_flags = ({} if getattr(args, "mode", "fixed") == "fixed"
+                       else {"mode": args.mode, "policy": args.policy})
         return run_walk_all(
             _abs(args.programs), _abs(args.run_dir), jobs=args.jobs, provider=args.provider,
             providers_config=_abs(args.providers_config) if args.providers_config else None,
             with_baseline=args.with_baseline, offline=args.offline,
-            no_cache=args.no_cache, retry_failed=args.retry_failed,
+            no_cache=args.no_cache, retry_failed=args.retry_failed, **agent_flags,
         )
 
     wcfg = load_config()["walk"]
@@ -270,6 +272,15 @@ def _cmd_walk(args: argparse.Namespace) -> int:
             print(f"--roots takes comma-separated addresses such as 0x1a2b; bad: {bad or args.roots!r}",
                   file=sys.stderr)
             return 2
+    if getattr(args, "mode", "fixed") == "agent":
+        if not roots:
+            print("--mode agent needs --roots ADDRS: the agent analyses one root at a time, "
+                  "not a whole program", file=sys.stderr)
+            return 2
+        if args.with_baseline:
+            print("--with-baseline belongs to --mode fixed; in agent mode read_summary already "
+                  "writes the no-context rows", file=sys.stderr)
+            return 2
     prog = json.loads(_abs(args.program).read_text(encoding="utf-8"))
     try:
         cfg_path = _abs(args.providers_config) if args.providers_config else None
@@ -282,14 +293,25 @@ def _cmd_walk(args: argparse.Namespace) -> int:
           f"cache {'on' if provider.cache is not None else 'OFF'}"
           f"{'  OFFLINE (replay only)' if provider.offline else ''}  run dir {run_dir}")
     try:
-        result = walk_program(
-            provider, prog, run_dir,
-            max_chars=wcfg["callee_context_max_chars"],
-            max_iterations=wcfg["scc_max_iterations"],
-            retry_failed=args.retry_failed,
-            with_baseline=args.with_baseline,
-            roots=roots,
-        )
+        if getattr(args, "mode", "fixed") == "agent":
+            from taintwalk.analysis.agent import Caps, agent_report, walk_agent_program
+            result = walk_agent_program(
+                provider, prog, run_dir, roots,
+                policy_name=getattr(args, "policy", "llm"),
+                caps=Caps.from_config(),
+                retry_failed=args.retry_failed,
+            )
+            report = agent_report
+        else:
+            result = walk_program(
+                provider, prog, run_dir,
+                max_chars=wcfg["callee_context_max_chars"],
+                max_iterations=wcfg["scc_max_iterations"],
+                retry_failed=args.retry_failed,
+                with_baseline=args.with_baseline,
+                roots=roots,
+            )
+            report = walk_report
     except LLMError as e:
         write_usage(run_dir, [provider])
         print(f"WALK FAIL: {type(e).__name__}: {e}")
@@ -299,7 +321,7 @@ def _cmd_walk(args: argparse.Namespace) -> int:
         print(f"WALK FAIL: {e}")
         return 1
     write_usage(run_dir, [provider])
-    return walk_report(result)
+    return report(result)
 
 
 def _cmd_score(args: argparse.Namespace) -> int:
@@ -421,6 +443,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     wk = sub.add_parser("walk", help="bottom-up interprocedural walk over one program.json (Phase 6)")
     wk.add_argument("--program", help="a program.json to walk")
+    wk.add_argument("--mode", choices=("fixed", "agent"), default="fixed",
+                    help="fixed: the bottom-up walk (Phase 6). agent: evidence gathering at each "
+                         "--roots address, judged by the same prompt (Phase 10, D-042)")
+    wk.add_argument("--policy", choices=("llm", "scripted"), default="llm",
+                    help="with --mode agent: llm (rung A2, the model chooses each action) or "
+                         "scripted (rung A1, read every direct callee, then stop)")
     wk.add_argument("--provider", help="provider name from config/providers.yaml (default: its 'default')")
     wk.add_argument("--run-dir",
                     help="output dir (default: config walk.out_dir); with --all, the root of one run dir per program")
