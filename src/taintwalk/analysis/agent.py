@@ -27,6 +27,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Literal
@@ -569,3 +570,51 @@ def agent_report(result: dict[str, Any]) -> int:
     ok = result["context_overflows"] == 0 and len(fns) == len(result["roots"])
     print("AGENT OK" if ok else "AGENT FAIL")
     return 0 if ok else 1
+
+
+class RunBudget:
+    """A metered-token ceiling for one `walk --all` run (D-042).
+
+    Claimed before a program starts and charged after it finishes, so the overshoot is bounded by
+    jobs x the per-program cap -- the bound D-042 pre-registers. Which programs get skipped depends
+    on thread scheduling, and that is harmless: a run that hits the ceiling is incomplete by
+    construction (the skipped programs have no summaries), exits non-zero, and the scorer fails
+    closed on a missing root. A ceilinged run is void, never a different result.
+    """
+
+    def __init__(self, ceiling: int) -> None:
+        if ceiling < 1:
+            raise ValueError("a run ceiling must be positive; 0 means unset")
+        self.ceiling = int(ceiling)
+        self.spent = 0
+        self.skipped: list[str] = []
+        self._lock = threading.Lock()
+
+    def claim(self, name: str) -> bool:
+        """True if this program may start. Records the name when it may not."""
+        with self._lock:
+            if self.spent >= self.ceiling:
+                self.skipped.append(name)
+                return False
+            return True
+
+    def charge(self, amount: int) -> int:
+        with self._lock:
+            self.spent += max(0, int(amount))
+            return self.spent
+
+    def as_dict(self) -> dict[str, Any]:
+        with self._lock:
+            return {"ceiling": self.ceiling, "spent": self.spent, "skipped": sorted(self.skipped)}
+
+
+def program_metered(run_dir: Path) -> int:
+    """What one agent program spent, read from the agent.json it wrote. 0 when there is none, so a
+    fixed walk (which writes walk.json instead) is never charged."""
+    f = Path(run_dir) / "agent.json"
+    if not f.is_file():
+        return 0
+    try:
+        return int(json.loads(f.read_text(encoding="utf-8")).get("metered_tokens") or 0)
+    except (ValueError, OSError, TypeError):
+        return 0

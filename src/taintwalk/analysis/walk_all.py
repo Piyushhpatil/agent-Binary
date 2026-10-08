@@ -39,7 +39,17 @@ from taintwalk.config import REPO_ROOT
 LOG_DIR = "logs"
 SUMMARY_FILE = "walk_all.json"
 # The verdict and token lines that walker.walk_report and cli._cmd_walk print.
-WALK_LINE = re.compile(r"^WALK (?:OK|FAIL)\b.*$", re.M)
+WALK_LINE = re.compile(r"^(?:WALK|AGENT) (?:OK|FAIL)\b.*$", re.M)
+OK_STATUS = ("WALK OK", "AGENT OK")            # agent mode reports AGENT OK/FAIL (D-042)
+
+
+def status_ok(status: str) -> bool:
+    """True for a success verdict line. parse_log returns the whole line, and a real one carries a
+    tail ("WALK OK  13 walked, 37 skipped"), so this is a prefix test, never equality."""
+    return status.startswith(OK_STATUS)
+
+SKIPPED_STATUS = "SKIPPED (run token ceiling)"
+BUDGET_FILE = "agent_budget.json"
 TOKENS_LINE = re.compile(
     r"^tokens \(this run\)\s*:\s*in (\d+)\s+out (\d+)\s+model time ([\d.]+) s\s+"
     r"cache hits (\d+) of (\d+) calls",
@@ -171,7 +181,7 @@ def run_subprocess(cmd: list[str], log: Path) -> int:
 
 def walk_all(programs: list[Path], root: Path, *, jobs: int = 1, runner: Runner | None = None,
              progress: Callable[[str], None] = _say, roots: dict[str, tuple[str, ...]] | None = None,
-             **flags: Any) -> list[WalkResult]:
+             budget: Any = None, **flags: Any) -> list[WalkResult]:
     """Walk every program. Results come back in input order, whatever the completion order."""
     if jobs < 1:
         raise ValueError("jobs must be at least 1")
@@ -179,15 +189,25 @@ def walk_all(programs: list[Path], root: Path, *, jobs: int = 1, runner: Runner 
     root = Path(root)
     (root / LOG_DIR).mkdir(parents=True, exist_ok=True)
     n = len(programs)
+    spent_by = None
+    if budget is not None:                      # imported only for an agent run with a ceiling
+        from taintwalk.analysis.agent import program_metered as spent_by
 
     def one(p: Path) -> WalkResult:
+        run_dir = root / p.stem
+        if budget is not None and not budget.claim(p.stem):
+            return WalkResult(program=str(p), name=p.stem, rc=2, status=SKIPPED_STATUS, ok=False,
+                              tokens_in=None, tokens_out=None, model_s=None, cache_hits=None,
+                              calls=None, wall_s=0.0)
         log = root / LOG_DIR / f"{p.stem}.log"
         t0 = time.monotonic()
-        rc = run(walk_command(p, root / p.stem, roots=(roots or {}).get(p.stem), **flags), log)
+        rc = run(walk_command(p, run_dir, roots=(roots or {}).get(p.stem), **flags), log)
         wall = time.monotonic() - t0
         info = parse_log(log.read_text(encoding="utf-8", errors="replace") if log.exists() else "")
+        if budget is not None:
+            budget.charge(spent_by(run_dir))
         return WalkResult(program=str(p), name=p.stem, rc=rc,
-                          ok=rc == 0 and info["status"] == "WALK OK", wall_s=round(wall, 3), **info)
+                          ok=rc == 0 and status_ok(info["status"]), wall_s=round(wall, 3), **info)
 
     results: dict[int, WalkResult] = {}
     ex = ThreadPoolExecutor(max_workers=jobs)
@@ -252,11 +272,27 @@ def run_walk_all(programs_src: Path, root: Path, *, jobs: int = 1, runner: Runne
         mode = "live, disk cache OFF"
     else:
         mode = "live, disk cache on"
+    budget = None
+    if flags.get("mode") == "agent":
+        from taintwalk.analysis.agent import RunBudget
+        from taintwalk.config import load_config
+        ceiling = int(load_config()["agent"]["max_tokens_per_run"])
+        if ceiling > 0:                         # 0 = unset until the freeze (D-042, mini-step 11)
+            budget = RunBudget(ceiling)
+            _say(f"run token ceiling: {ceiling} metered  "
+                 f"(claimed before each program; overshoot bound {jobs} x the per-root cap)")
     _say(f"walk --all: {len(programs)} programs -> {root}  jobs {jobs}  {mode}")
     t0 = time.monotonic()
-    results = walk_all(programs, root, jobs=jobs, runner=runner, roots=roots, **flags)
+    results = walk_all(programs, root, jobs=jobs, runner=runner, roots=roots, budget=budget, **flags)
     wall = time.monotonic() - t0
     out = write_summary(root, results, jobs=jobs, flags=flags, wall_s=wall)
+    if budget is not None:
+        state = budget.as_dict()
+        (root / BUDGET_FILE).write_text(json.dumps(state, indent=2, sort_keys=True) + "\n",
+                                        encoding="utf-8")
+        if state["skipped"]:
+            print(f"RUN TOKEN CEILING HIT: {len(state['skipped'])} programs skipped, spent "
+                  f"{state['spent']} of {state['ceiling']}. This run is incomplete: do not score it.")
     t = _totals(results)
     bad = [r for r in results if not r.ok]
     print(f"\nprograms           : {len(results)}  WALK OK {len(results) - len(bad)}")
