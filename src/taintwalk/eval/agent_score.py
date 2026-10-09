@@ -10,6 +10,11 @@ Four rules fail the scorer closed, each guarding one way the comparison could be
   3. any taintwalk.llm module loaded in this process   -> a model could have been called while scoring;
   4. a root missing from any rung                      -> an incomplete run (a ceilinged run is void).
 
+Real code (mini-step 9b): the same four rungs at the 24 Phase 9 roots, scored as D-040 pairs. The
+roots, R4 and R5 come from real_score.py's own loaders, imported rather than re-written, so they are
+the rows the Phase 9 gate validated. A1 and A2 come from <real-agent-root>/<policy>/<case_id>/. Rules
+1, 2 and 4 apply there too. Descriptive only, no tests (D-042).
+
 Reads only. Byte-identical on unchanged input. Splices one section into RESULTS.md.
 
     python -m taintwalk.eval.agent_score --dev            # development slice, not reportable
@@ -26,7 +31,10 @@ from typing import Any
 
 from taintwalk.config import REPO_ROOT, load_config
 from taintwalk.eval.ablation import preregistered_tests
-from taintwalk.eval.metrics import score_rung
+from taintwalk.eval.metrics import OUTCOMES, _cell, confusion, score_rung
+from taintwalk.eval.real_score import (
+    PAIR_OUTCOMES, SHORT, RealScoreError, _pair_counts, load_roots, pair_outcome, r4_doc, r5_doc,
+)
 
 # NOTE: analyze_one is deliberately NOT imported. It pulls in taintwalk.llm, which would trip this
 # module's own rule 3 (no provider module may be loaded while scoring) on the very first call.
@@ -39,10 +47,11 @@ BEGIN, END = "<!-- phase10:begin -->", "<!-- phase10:end -->"
 P10_COMPARISONS = (("A2vR5", "A2", "R5"), ("A2vA1", "A2", "A1"), ("A2vR4", "A2", "R4"))
 RUNGS = ("R4", "A1", "A2", "R5")
 
-# Counts a primary confusion dict must carry (D-008 cells, from metrics._cell). Validated once,
-# with the real key list in the error, so a shape mismatch is one line to read instead of a
-# traceback three calls deep.
-COUNT_KEYS = ("TP", "FN", "FP", "TN")
+# metrics.confusion() returns the rates at the top level and the D-008 counts nested under "cells"
+# (probed 2026-10-08: keys cells, coverage, f1, negatives, positives, precision, recall, roots,
+# specificity). _cells flattens them. The legal cell names come from metrics._cell itself, so they
+# cannot drift; a name outside them fails closed, and a name merely absent (a zero count) reads 0.
+CELL_NAMES = tuple(sorted({_cell(lab, o) for lab in ("bad", "good") for o in OUTCOMES}))
 RATE_KEYS = ("recall", "specificity", "precision", "coverage")
 ABSTAIN_KEYS = ("FN_abstain", "abstain")
 
@@ -227,32 +236,190 @@ def process_table(agent_root: Path, cases: list[tuple[str, str, list[str]]]) -> 
 # --------------------------------------------------------------------------- cells
 
 def _cells(scored: dict[str, Any], rung: str) -> dict[str, Any]:
-    """The pooled primary confusion dict, validated once so a shape surprise names itself."""
+    """The pooled primary confusion dict, flattened: its rates plus one count per D-008 cell name.
+    Validated once so a shape surprise names itself."""
     strata = scored.get("strata") or {}
     if "pooled" not in strata:
         raise AgentScoreError(f"{rung}: no pooled stratum; strata are {sorted(strata)}")
     c = strata["pooled"].get("primary")
     if not isinstance(c, dict):
         raise AgentScoreError(f"{rung}: pooled stratum has no primary confusion dict")
-    missing = [k for k in COUNT_KEYS if k not in c]
-    if missing:
+    counts = c.get("cells")
+    if not isinstance(counts, dict):
         raise AgentScoreError(
-            f"{rung}: primary confusion lacks {missing}; its actual keys are {sorted(c)}")
-    if not any(k in c for k in ABSTAIN_KEYS):
+            f"{rung}: primary confusion has no cells dict; its actual keys are {sorted(c)}")
+    unknown = sorted(set(counts) - set(CELL_NAMES))
+    if unknown:
         raise AgentScoreError(
-            f"{rung}: primary confusion has no abstention count (tried {list(ABSTAIN_KEYS)}); "
-            f"its actual keys are {sorted(c)}")
-    return c
+            f"{rung}: unknown cell names {unknown}; expected a subset of {list(CELL_NAMES)}")
+    flat = {k: v for k, v in c.items() if k != "cells"}
+    flat.update({k: int(counts.get(k) or 0) for k in CELL_NAMES})
+    return flat
 
 
 def _abstain(c: dict[str, Any]) -> int:
     return sum(int(c.get(k) or 0) for k in ABSTAIN_KEYS if k in c)
 
 
+# --------------------------------------------------------------------------- real code (D-040)
+
+POLICIES = (("A1", "scripted"), ("A2", "llm"))
+GROUPS = ("all", "with_callees", "no_callee")
+
+
+def real_inputs(manifest: dict[str, Any], programs_dir: Path, r4_dir: Path, walk_root: Path
+                ) -> tuple[list[dict[str, Any]], dict[str, dict[tuple[str, str], str]], dict[tuple[str, str], int]]:
+    """The 24 roots, their R4 and R5 outcomes, and each root's walk callee-block size, all through
+    real_score's loaders (the Phase 9 gate's code path), so 9b cannot read a different row."""
+    try:
+        roots, _progs = load_roots(manifest, Path(programs_dir))
+        r4, _ = r4_doc(Path(r4_dir), roots)
+        r5, _, ctx = r5_doc(Path(walk_root), roots)
+    except RealScoreError as e:
+        raise AgentScoreError(f"real: {e}") from e
+    outcomes: dict[str, dict[tuple[str, str], str]] = {"R4": {}, "R5": {}}
+    for r in roots:
+        sha, addr = r["binary_sha256"], r["addr"]
+        outcomes["R4"][(sha, addr)] = r4["programs"][sha][addr]["outcome"]
+        outcomes["R5"][(sha, addr)] = r5["programs"][sha][addr]["outcome"]
+    return roots, outcomes, ctx
+
+
+def real_cases(roots: list[dict[str, Any]]) -> list[tuple[str, str, list[str]]]:
+    """(case_id, sha, roots) per binary. One binary can hold the post root of one pair and the pre
+    root of another, so a case may carry two roots; they are numerically sorted, as in agent_sets."""
+    by: dict[str, tuple[str, list[str]]] = {}
+    for r in roots:
+        sha, addrs = by.setdefault(r["case_id"], (r["binary_sha256"], []))
+        if sha != r["binary_sha256"]:
+            raise AgentScoreError(f"real: {r['case_id']} maps to two binaries")
+        addrs.append(r["addr"])
+    return [(c, sha, sorted(set(a), key=lambda x: int(x, 16))) for c, (sha, a) in sorted(by.items())]
+
+
+def real_pairs(roots: list[dict[str, Any]], outcomes: dict[str, dict[tuple[str, str], str]],
+               ctx: dict[tuple[str, str], int]) -> dict[str, Any]:
+    """Pure: per-rung root outcomes -> D-008 cells and D-040 pair outcomes. Rule 4 holds here too:
+    every root needs a row in every rung, and every pair both of its sides."""
+    missing = [k for k in RUNGS if k not in outcomes]
+    if missing:
+        raise AgentScoreError(f"real: rungs missing: {missing}")
+    rows: dict[str, list[dict[str, Any]]] = {k: [] for k in RUNGS}
+    sides: dict[str, dict[str, dict[str, Any]]] = {}
+    for r in roots:
+        key = (r["binary_sha256"], r["addr"])
+        where = f"{r['pair_id']} {r['side']} {r['case_id']} {r['addr']}"
+        o: dict[str, str] = {}
+        for k in RUNGS:
+            if key not in outcomes[k]:
+                raise AgentScoreError(f"real {k}: no row for {where}")
+            if outcomes[k][key] not in OUTCOMES:
+                raise AgentScoreError(f"real {k}: invalid outcome {outcomes[k][key]!r} for {where}")
+            o[k] = outcomes[k][key]
+            rows[k].append({"label": r["label"], "outcome": o[k], "cell": _cell(r["label"], o[k])})
+        if key not in ctx:
+            raise AgentScoreError(f"real: no walk context size for {where}")
+        sides.setdefault(r["pair_id"], {})[r["side"]] = {**r, "outcomes": o, "context_chars": ctx[key]}
+
+    pairs: list[dict[str, Any]] = []
+    for pid in sorted(sides):
+        if set(sides[pid]) != {"pre", "post"}:
+            raise AgentScoreError(f"real: pair {pid} has sides {sorted(sides[pid])}")
+        pre, post = sides[pid]["pre"], sides[pid]["post"]
+        pairs.append({
+            "pair_id": pid, "cve": pre["cve"], "project": pre["project"], "function": pre["function"],
+            "no_callee": pre["context_chars"] == 0 and post["context_chars"] == 0,
+            "pre": pre["outcomes"], "post": post["outcomes"],
+            "outcomes": {k: _pair_outcome(pre["outcomes"][k], post["outcomes"][k]) for k in RUNGS},
+        })
+    groups = {"all": pairs, "with_callees": [p for p in pairs if not p["no_callee"]],
+              "no_callee": [p for p in pairs if p["no_callee"]]}
+    return {
+        "pairs": len(pairs), "roots": len(roots),
+        "cells": {k: _cells({"strata": {"pooled": {"primary": confusion(rows[k])}}}, f"real {k}")
+                  for k in RUNGS},
+        "pair_outcomes": {g: {k: _pair_counts(ps, k) for k in RUNGS} for g, ps in groups.items()},
+        "pairs_detail": pairs,
+    }
+
+
+def _pair_outcome(pre: str, post: str) -> str:
+    """real_score.pair_outcome, with its RealScoreError turned into this module's fail-closed error."""
+    try:
+        return pair_outcome(pre, post)
+    except RealScoreError as e:
+        raise AgentScoreError(f"real: {e}") from e
+
+
+def score_real(agent_root: Path, *, manifest: dict[str, Any], programs_dir: Path, r4_dir: Path,
+               walk_root: Path) -> dict[str, Any]:
+    """A1 and A2 at the Phase 9 roots, beside Phase 9's own R4 and R5, under rules 1, 2 and 4."""
+    roots, outcomes, ctx = real_inputs(manifest, programs_dir, r4_dir, walk_root)
+    cases = real_cases(roots)
+    tables: dict[str, dict[str, Any]] = {
+        "R4": {c: {"rows": {a: {"outcome": outcomes["R4"][(sha, a)]} for a in rs}} for c, sha, rs in cases}}
+    for rung, policy in POLICIES:
+        tables[rung] = {}
+        outcomes[rung] = {}
+        ids: set[str] = set()
+        for c, sha, rs in cases:
+            d = Path(agent_root) / policy / c
+            rows = walk_rows(d, rs)
+            ids.add(json.dumps(_identity(d, ("policy", "agent_prompt_version")), sort_keys=True))
+            tables[rung][c] = {"rows": rows}
+            for a in rs:
+                outcomes[rung][(sha, a)] = rows[a]["outcome"]
+        if len(ids) > 1:
+            raise AgentScoreError(f"real {rung}: runs differ in policy or agent prompt version ({len(ids)})")
+    floor = check_floor(agent_root, cases, tables)
+    return {**real_pairs(roots, outcomes, ctx), "floor": floor,
+            "process": process_table(agent_root, cases)}
+
+
 # --------------------------------------------------------------------------- render
 
 def _f(x: Any) -> str:
+    """A rate as 3 decimals. metrics carries rates as Wilson dicts ({"value": ...}, as real_score
+    reads them), so the point estimate is unwrapped; a bare number passes through."""
+    if isinstance(x, dict):
+        x = x.get("value")
     return "\u2014" if x is None else (f"{x:.3f}" if isinstance(x, (int, float)) else str(x))
+
+
+def _cell_rows(cells: dict[str, dict[str, Any]]) -> list[str]:
+    return [f"| {r} | {c.get('TP', 0)} | {c.get('FN', 0)} | {c.get('FP', 0)} | "
+            f"{c.get('TN', 0)} | {_abstain(c)} | "
+            + " | ".join(_f(c.get(k)) for k in RATE_KEYS) + " |"
+            for r, c in ((r, cells[r]) for r in RUNGS)]
+
+
+CELL_HEADER = ["| Rung | TP | FN | FP | TN | Abstain | Recall | Specificity | Precision | Coverage |",
+               "|---|---|---|---|---|---|---|---|---|---|"]
+
+
+def render_real(rd: dict[str, Any]) -> list[str]:
+    """The real-code subsection: cells, D-040 pair outcomes by group, and every pair."""
+    L = ["", f"### Real code: {rd['pairs']} vulnerable/patched pairs, {rd['roots']} roots (D-040)", "",
+         "The same judge and rungs at the Phase 9 roots. A pair is correct only if its pre-fix root "
+         "is flagged and its post-fix root is clear. Descriptive; no tests (D-042).", "",
+         *CELL_HEADER, *_cell_rows(rd["cells"]), "",
+         "| Group | Rung | Pairs | Pair-correct | Both vulnerable | Both clear | Reversed | Abstained |",
+         "|---|---|---|---|---|---|---|---|"]
+    for g in GROUPS:
+        for r in RUNGS:
+            po = rd["pair_outcomes"][g][r]
+            L.append(f"| {g} | {r} | {po['pairs']} | "
+                     + " | ".join(str(po[o]) for o in PAIR_OUTCOMES) + " |")
+    L += ["", "Pre/post outcome per rung: F flagged, C clear, A abstained.", "",
+          "| Pair | CVE | Project | Function | No callee | " + " | ".join(RUNGS) + " |",
+          "|---|---|---|---|---|" + "---|" * len(RUNGS)]
+    for p in rd["pairs_detail"]:
+        L.append(f"| {p['pair_id']} | {p['cve']} | {p['project']} | {p['function']} | "
+                 f"{'yes' if p['no_callee'] else ''} | "
+                 + " | ".join(f"{SHORT[p['pre'][r]]}/{SHORT[p['post'][r]]}" for r in RUNGS) + " |")
+    L += ["", f"Real-code floor check: {rd['floor']['zero_fetch_roots']} zero-fetch roots, all equal "
+              f"to their R4 cell. Caps held on every root."]
+    return L
 
 
 def _d(d: dict[str, Any]) -> str:
@@ -264,13 +431,7 @@ def render(doc: dict[str, Any]) -> str:
          f"Status: {doc['status']}", "",
          "One judge for every rung; only the evidence block differs. "
          "R4 no evidence, A1 scripted reads, A2 agent-chosen reads, R5 the fixed walk.", "",
-         "| Rung | TP | FN | FP | TN | Abstain | Recall | Specificity | Precision | Coverage |",
-         "|---|---|---|---|---|---|---|---|---|---|"]
-    for r in RUNGS:
-        c = doc["cells"][r]
-        L.append(f"| {r} | {c.get('TP', 0)} | {c.get('FN', 0)} | {c.get('FP', 0)} | "
-                 f"{c.get('TN', 0)} | {_abstain(c)} | "
-                 + " | ".join(_f(c.get(k)) for k in RATE_KEYS) + " |")
+         *CELL_HEADER, *_cell_rows(doc["cells"])]
 
     t = doc["tests"]
     holm_note = "" if t["holm_applied"] else "; NOT APPLIED, family incomplete"
@@ -297,7 +458,10 @@ def render(doc: dict[str, Any]) -> str:
                  + ", ".join(f"{k} {v}" for k, v in doc["process"][r]["stops"].items()))
 
     L += ["", f"Floor check: {doc['floor']['zero_fetch_roots']} zero-fetch roots, all equal to "
-              f"their R4 cell. Caps held on every root.", "", END, ""]
+              f"their R4 cell. Caps held on every root."]
+    if doc.get("real"):
+        L += render_real(doc["real"])
+    L += ["", END, ""]
     return "\n".join(L)
 
 
@@ -320,7 +484,8 @@ def splice(md: Path, section: str) -> None:
 # --------------------------------------------------------------------------- main
 
 def score(agent_root: Path, walk_root: Path, cases: list[tuple[str, str, list[str]]], *,
-          status: str) -> dict[str, Any]:
+          status: str, real: dict[str, Path] | None = None) -> dict[str, Any]:
+    """`real`, when given, holds the paths score_real needs: agent_root, manifest, programs, r4, walk."""
     check_no_provider()
     cfg = load_config()
     manifest_rel = cfg.get("corpus", {}).get("manifest", "corpus/manifest.json")
@@ -345,7 +510,11 @@ def score(agent_root: Path, walk_root: Path, cases: list[tuple[str, str, list[st
 
     tests = preregistered_tests({r: scored[r]["roots"] for r in RUNGS},
                                 comparisons=P10_COMPARISONS)
-    return {"score_version": SCORE_VERSION, "rules": "D-042", "status": status,
+    real_doc = None
+    if real:
+        real_doc = score_real(real["agent_root"], manifest=_read_json(real["manifest"]),
+                              programs_dir=real["programs"], r4_dir=real["r4"], walk_root=real["walk"])
+    return {"score_version": SCORE_VERSION, "rules": "D-042", "status": status, "real": real_doc,
             "roots": len(next(iter(keys.values()))),
             "cells": {r: _cells(scored[r], r) for r in RUNGS},
             "tests": tests, "process": process_table(agent_root, cases), "floor": floor,
@@ -382,6 +551,15 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--results-md", type=Path, default=None)
     ap.add_argument("--dev", action="store_true",
                     help="development slice: never reportable, never spliced (D-028, D-042)")
+    ap.add_argument("--real-agent-root", type=Path, default=Path("runs/p10-real"),
+                    help="root holding <policy>/<case_id>/ run dirs for the Phase 9 programs")
+    ap.add_argument("--real-programs", type=Path, default=Path("runs/p9-real/programs"))
+    ap.add_argument("--real-r4", type=Path, default=Path("runs/p9-real/r4"))
+    ap.add_argument("--real-walk", type=Path, default=Path("runs/p9-real/walk"))
+    ap.add_argument("--real-manifest", type=Path, default=None,
+                    help="default: config real.manifest")
+    ap.add_argument("--no-real", action="store_true",
+                    help="Juliet only (always so with --dev: the dev slice has no real code)")
     args = ap.parse_args(argv)
 
     agent_root = args.agent_root or Path("runs/p10-dev" if args.dev else "runs/p10-scored")
@@ -391,7 +569,12 @@ def main(argv: list[str] | None = None) -> int:
               else "scored set, local model only (D-034)")
     try:
         cases = load_cases(programs)
-        doc = score(agent_root, args.walk_root, cases, status=status)
+        real = None
+        if not (args.dev or args.no_real):
+            real = {"agent_root": args.real_agent_root,
+                    "manifest": args.real_manifest or REPO_ROOT / load_config()["real"]["manifest"],
+                    "programs": args.real_programs, "r4": args.real_r4, "walk": args.real_walk}
+        doc = score(agent_root, args.walk_root, cases, status=status, real=real)
     except (AgentScoreError, OSError, KeyError, ValueError) as e:
         print(f"AGENT EVAL FAIL: {type(e).__name__}: {e}")
         return 1
@@ -405,9 +588,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.results_md and not args.dev:
         splice(args.results_md, section)
     t = doc["tests"]
+    rd = doc["real"]
+    real_note = f"; real {rd['pairs']} pairs, {rd['roots']} roots" if rd else "; real not scored"
     print(f"AGENT EVAL OK: {doc['roots']} roots, rungs {' '.join(RUNGS)}, "
-          f"{len(t['tests'])} tests, Holm {'applied' if t['holm_applied'] else 'NOT applied'} "
-          f"-> {out / 'agent.json'}")
+          f"{len(t['tests'])} tests, Holm {'applied' if t['holm_applied'] else 'NOT applied'}"
+          f"{real_note} -> {out / 'agent.json'}")
     return 0
 
 

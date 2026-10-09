@@ -1,9 +1,11 @@
-"""Phase 10 scorer (D-042): row shape, the fail-closed rules, rendering and an idempotent splice.
+"""Phase 10 scorer (D-042): row shape, the fail-closed rules, rendering and an idempotent splice,
+and (mini-step 9b) the real-code D-040 pair outcomes.
 
 What is NOT tested here: score() end to end. It calls check_no_provider() first, and pytest has
 taintwalk.llm loaded by other modules, so score() can only run in a subprocess -- exactly as
 tests/test_score.py does for `taintwalk score`. The end-to-end run arrives with the real dev run
-dirs in mini-step 10.
+dirs in mini-step 10. score_real's glue reuses real_score's loaders; mini-step 9b's check block
+runs it against the persisted Phase 9 rows instead of a fixture.
 """
 import json
 import pathlib
@@ -14,8 +16,8 @@ import pytest
 
 from taintwalk.eval import agent_score as A
 from taintwalk.eval.agent_score import (
-    AgentScoreError, _abstain, _cells, _dist, _row, _stem, check_floor, check_no_provider,
-    load_cases, render, splice,
+    AgentScoreError, _abstain, _cells, _dist, _f, _row, _stem, check_floor, check_no_provider,
+    load_cases, real_cases, real_pairs, render, splice,
 )
 from taintwalk.eval.metrics import row_from_finding
 
@@ -155,10 +157,24 @@ def test_check_no_provider_both_directions():
 # --------------------------------------------------------------------------- cells and stats
 
 def test_cells_names_the_real_keys_when_the_shape_surprises_us():
-    with pytest.raises(AgentScoreError, match=r"actual keys are \['FN', 'TP', 'oops'\]"):
+    with pytest.raises(AgentScoreError, match=r"no cells dict; its actual keys are \['FN', 'TP', 'oops'\]"):
         _cells({"strata": {"pooled": {"primary": {"TP": 1, "FN": 2, "oops": 3}}}}, "A2")
+    with pytest.raises(AgentScoreError, match=r"unknown cell names \['tp'\]"):
+        _cells({"strata": {"pooled": {"primary": {"cells": {"tp": 1}}}}}, "A2")
     with pytest.raises(AgentScoreError, match="no pooled stratum"):
         _cells({"strata": {"external": {"primary": {}}}}, "A2")
+
+
+def test_cells_flattens_the_real_confusion_shape():
+    """metrics.confusion() nests counts under 'cells' and may omit a zero count; rates stay put."""
+    from taintwalk.eval.metrics import _cell, confusion
+    rows = [{"label": "bad", "outcome": "flagged", "cell": _cell("bad", "flagged")},
+            {"label": "good", "outcome": "abstain", "cell": _cell("good", "abstain")}]
+    c = confusion(rows)
+    flat = _cells({"strata": {"pooled": {"primary": c}}}, "R4")
+    assert (flat["TP"], flat["FN"], flat["FP"], flat["TN"], _abstain(flat)) == (1, 0, 0, 0, 1)
+    assert "cells" not in flat and flat["recall"] == c["recall"]
+    assert set(A.CELL_NAMES) == {"TP", "FN", "FN_abstain", "FP", "TN", "abstain"}
 
 
 def test_abstain_sums_both_abstention_cells():
@@ -233,3 +249,83 @@ def test_load_cases_reads_paths_and_roots(tmp_path, monkeypatch):
     empty.write_text("# nothing\n", encoding="utf-8")
     with pytest.raises(AgentScoreError, match="no programs"):
         load_cases(empty)
+
+
+# --------------------------------------------------------------------------- real code (9b, D-040)
+
+SHA = {"rw-0001": "1" * 64, "rw-0002": "2" * 64, "rw-0003": "3" * 64}
+
+
+def _root(pair, side, case, addr):
+    return {"pair_id": pair, "cve": f"CVE-{pair}", "project": "p", "function": f"f{pair[-1]}",
+            "side": side, "label": "bad" if side == "pre" else "good", "case_id": case,
+            "addr": addr, "binary_sha256": SHA[case]}
+
+
+# rw-0002 holds the post root of rp-01 and the pre root of rp-02, as a real binary can.
+ROOTS = [_root("rp-01", "pre", "rw-0001", "0x10"), _root("rp-01", "post", "rw-0002", "0x30"),
+         _root("rp-02", "pre", "rw-0002", "0x20"), _root("rp-02", "post", "rw-0003", "0x40")]
+F, C, AB = "flagged", "clear", "abstain"
+# per rung, outcomes in ROOTS order: rp-01 pre, rp-01 post, rp-02 pre, rp-02 post
+PLAN = {"R4": (F, F, F, F),      # both vulnerable twice
+        "A1": (F, C, F, F),      # pair-correct, both vulnerable
+        "A2": (AB, C, C, F),     # abstained, reversed
+        "R5": (C, C, F, C)}      # both clear, pair-correct
+CTX = {("1" * 64, "0x10"): 0, ("2" * 64, "0x30"): 0,       # rp-01: no callee block at either root
+       ("2" * 64, "0x20"): 512, ("3" * 64, "0x40"): 0}
+
+
+def _outcomes(plan=PLAN):
+    return {k: {(r["binary_sha256"], r["addr"]): o for r, o in zip(ROOTS, v)} for k, v in plan.items()}
+
+
+def test_real_cases_groups_a_shared_binary_and_sorts_numerically():
+    cases = real_cases(list(reversed(ROOTS)))
+    assert [c[0] for c in cases] == ["rw-0001", "rw-0002", "rw-0003"]
+    assert cases[1] == ("rw-0002", "2" * 64, ["0x20", "0x30"])
+
+
+def test_real_pairs_gives_each_d040_outcome():
+    d = real_pairs(ROOTS, _outcomes(), CTX)
+    assert (d["pairs"], d["roots"]) == (2, 4)
+    po = d["pair_outcomes"]["all"]
+    assert po["R4"]["both_vulnerable"] == 2
+    assert (po["A1"]["pair_correct"], po["A1"]["both_vulnerable"]) == (1, 1)
+    assert (po["A2"]["abstained"], po["A2"]["reversed"]) == (1, 1)
+    assert (po["R5"]["both_clear"], po["R5"]["pair_correct"]) == (1, 1)
+    assert d["pair_outcomes"]["no_callee"]["R4"]["pairs"] == 1
+    assert d["pair_outcomes"]["with_callees"]["R4"]["pairs"] == 1
+    assert [p["no_callee"] for p in d["pairs_detail"]] == [True, False]
+
+
+def test_real_pairs_cells_follow_d008():
+    """A flagged post-fix root is an FP; an abstaining pre-fix root is never a TP."""
+    c = real_pairs(ROOTS, _outcomes(), CTX)["cells"]
+    assert (c["R4"]["TP"], c["R4"]["FP"], c["R4"]["TN"]) == (2, 2, 0)
+    assert c["A2"]["TP"] == 0 and _abstain(c["A2"]) == 1
+
+
+def test_real_pairs_fails_closed_on_a_missing_row_or_side():
+    out = _outcomes()
+    del out["A2"][("1" * 64, "0x10")]
+    with pytest.raises(AgentScoreError, match="real A2: no row for rp-01 pre"):
+        real_pairs(ROOTS, out, CTX)
+    with pytest.raises(AgentScoreError, match="rp-01 has sides"):
+        real_pairs(ROOTS[1:], _outcomes(), CTX)
+    with pytest.raises(AgentScoreError, match="rungs missing"):
+        real_pairs(ROOTS, {k: v for k, v in _outcomes().items() if k != "A1"}, CTX)
+
+
+def test_render_adds_the_real_section_without_touching_the_juliet_tables():
+    real = {**real_pairs(ROOTS, _outcomes(), CTX), "floor": {"zero_fetch_roots": 2}}
+    s = render({**DOC, "real": real})
+    assert s.count(A.BEGIN) == 1 and s.count(A.END) == 1
+    assert s.split("### Real code")[0] == render(DOC).split(f"\n{A.END}")[0] + "\n"
+    assert "| rp-01 | CVE-rp-01 | p | f1 | yes | F/F | F/C | A/C | C/C |" in s
+    assert "| rp-02 | CVE-rp-02 | p | f2 |  | F/F | F/F | C/F | F/C |" in s
+    assert s.count("| A2 vs ") == 6
+
+
+def test_f_unwraps_a_wilson_rate():
+    assert _f({"value": 0.5, "lo": 0.1, "hi": 0.9}) == "0.500"
+    assert _f({"value": None}) == "\u2014" and _f(0.25) == "0.250" and _f(None) == "\u2014"
