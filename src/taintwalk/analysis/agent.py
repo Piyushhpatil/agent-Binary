@@ -43,7 +43,11 @@ from taintwalk.analysis.prompts import (
 )
 from taintwalk.llm.base import ContextOverflow, LLMProvider
 
-AGENT_PROMPT_VERSION = 1
+# v2 (mini-step 10e, dev run): the v1 step prompt let the model read addresses off Ghidra names
+# (FUN_00101c04), which carry the image base; tools use program.json addresses (0x1c04, D-016), so
+# every v1 target was refused. v2 lists each target explicitly and names the valid ones on a refusal.
+AGENT_PROMPT_VERSION = 2
+MAX_LISTED_TARGETS = 20
 ADDR_RE = re.compile(r"0x[0-9a-f]+")
 
 STOP_REASONS = ("finish", "max_actions", "max_calls", "max_tokens",
@@ -65,7 +69,8 @@ Actions:
 - finish: stop gathering. target must be the empty string.
 
 Rules:
-- target is a lowercase hex address such as 0x1234, taken from the code or from an earlier result.
+- target is copied exactly from a "target 0x..." entry in the lists you are shown. Function names such as FUN_00101c04 contain a different number; never use that number as a target.
+- If no listed target could change the judgement, choose finish.
 - You may not target the function under analysis. Its code is already shown to you.
 - Repeating an action you have already performed is wasted; it costs a step and returns nothing new.
 - Choose finish as soon as further reading could not change the judgement.
@@ -220,9 +225,43 @@ def build_evidence(lines: tuple[str, ...], views: list[CalleeView],
     return "", {"omitted_code_reads": len(code_items), "omitted_summaries": len(views)}
 
 
+def _target_line(it: dict[str, str]) -> str:
+    return f"  target {it['addr']} = {it['name']} ({it['status']})\n"
+
+
+def valid_targets(state: AgentState) -> list[str]:
+    """Targets the model has been shown and may use: the root's direct callees plus every listing so
+    far, minus out-of-scope stubs (not in the closure) and the root itself, in address order."""
+    seen: set[str] = set()
+    for it in list_callees(state.scope, state.root):
+        if it["status"] != "out_of_scope":
+            seen.add(it["addr"])
+    for items in state.listings.values():
+        for it in items:
+            if it["status"] != "out_of_scope":
+                seen.add(it["addr"])
+    seen.discard(state.root)
+    return sorted(seen, key=lambda a: int(a, 16))
+
+
+def refusal_detail(state: AgentState, err: Exception) -> str:
+    valid = valid_targets(state)
+    shown = ", ".join(valid[:MAX_LISTED_TARGETS]) or "none"
+    more = f" (and {len(valid) - MAX_LISTED_TARGETS} more)" if len(valid) > MAX_LISTED_TARGETS else ""
+    return f"{err}. Valid targets: {shown}{more}"
+
+
 def render_step_user(state: AgentState) -> str:
-    """The step prompt: the root's numbered code, then everything gathered so far."""
-    parts = [render_user(state.root_name, state.lines), "\nEvidence gathered so far:\n"]
+    """The step prompt: the root's numbered code, its direct callees as explicit targets, then
+    everything gathered so far."""
+    parts = [render_user(state.root_name, state.lines),
+             "\nFunctions called by the function under analysis "
+             "(use the target exactly as written):\n"]
+    direct = list_callees(state.scope, state.root)
+    if not direct:
+        parts.append("  (none)\n")
+    parts += [_target_line(it) for it in direct]
+    parts.append("\nEvidence gathered so far:\n")
     if not state.steps:
         parts.append("  (nothing yet)\n")
     for s in state.steps:
@@ -232,8 +271,7 @@ def render_step_user(state: AgentState) -> str:
         parts.append(f"\nFunctions called by {addr}:\n")
         if not items:
             parts.append("  (none)\n")
-        for it in items:
-            parts.append(f"  {it['addr']} {it['name']} ({it['status']})\n")
+        parts += [_target_line(it) for it in items]
     for addr, text in state.code_reads.items():
         parts.append(f"\nCode of {addr}:\n{text}\n")
     if state.fetched:
@@ -382,8 +420,8 @@ def run_agent(provider: LLMProvider, prog: dict[str, Any], addr: str, run_dir: P
                 detail = view.status
         except ToolError as e:
             invalid += 1
-            state.steps.append(Step(idx, act.action, act.target, act.reason, "refused", str(e),
-                                    step_metered, step_calls))
+            state.steps.append(Step(idx, act.action, act.target, act.reason, "refused",
+                                    refusal_detail(state, e), step_metered, step_calls))
             continue
 
         executed.add(key)
@@ -519,7 +557,6 @@ def walk_agent_program(provider: LLMProvider, prog: dict[str, Any], run_dir: Pat
         functions[addr] = {
             "function": row.get("function") or _fn_name(prog, addr),
             "status": row.get("status"), "failure": row.get("failure") or "",
-            "cache_hit": bool(row.get("cache_hit")),
             "policy": a.get("policy", policy_name), "stop": a.get("stop", ""),
             "steps": a.get("steps", 0), "calls": a.get("calls", 0),
             "metered_tokens": a.get("metered_tokens", 0),
