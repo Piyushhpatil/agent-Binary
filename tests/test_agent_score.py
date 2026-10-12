@@ -329,3 +329,20 @@ def test_render_adds_the_real_section_without_touching_the_juliet_tables():
 def test_f_unwraps_a_wilson_rate():
     assert _f({"value": 0.5, "lo": 0.1, "hi": 0.9}) == "0.500"
     assert _f({"value": None}) == "\u2014" and _f(0.25) == "0.250" and _f(None) == "\u2014"
+
+
+def test_process_table_names_abstentions(tmp_path):
+    """A root whose judge gave no verdict is named by its failure, never silently dropped."""
+    ok = {**_fn(), "judge": "ok", "status": "ok", "failure": ""}
+    bad = {**_fn(), "judge": "failed", "status": "failed", "failure": "max_tokens"}
+    budget = {**_fn(), "judge": "agent:budget", "status": "failed", "failure": "agent:budget"}
+    cases = [("tw-0015", "0" * 64, ["0x1000", "0x1100", "0x1200"])]
+    _write_agent_dirs(tmp_path, {
+        "scripted": _agent_doc({"0x1000": ok, "0x1100": ok, "0x1200": ok}),
+        "llm": _agent_doc({"0x1000": ok, "0x1100": bad, "0x1200": budget})})
+    t = A.process_table(tmp_path, cases)
+    assert t["A1"]["abstentions"] == {}
+    assert t["A2"]["abstentions"] == {"agent:budget": 1, "max_tokens": 1}
+    s = render({**DOC, "process": t})
+    assert "A2 abstentions by name: agent:budget 1, max_tokens 1" in s
+    assert "A1 abstentions by name: none" in s

@@ -210,6 +210,7 @@ def process_table(agent_root: Path, cases: list[tuple[str, str, list[str]]]) -> 
         fetched: list[int] = []
         reads: list[int] = []
         stops: dict[str, int] = {}
+        abstained: dict[str, int] = {}
         invalid = repeated = zero = 0
         for case_id, _sha, roots in cases:
             doc = _read_json(Path(agent_root) / policy / case_id / "agent.json")
@@ -223,11 +224,15 @@ def process_table(agent_root: Path, cases: list[tuple[str, str, list[str]]]) -> 
                 invalid += int(f["invalid_actions"])
                 repeated += int(f["repeated_actions"])
                 zero += not f["summaries_fetched"] and not f["code_read"]
+                if f.get("judge", "ok") != "ok":       # no verdict: name it (D-040 rule 4)
+                    why = f.get("failure") or f.get("judge") or "unknown"
+                    abstained[why] = abstained.get(why, 0) + 1
         out[rung] = {
             "policy": policy, "roots": len(steps),
             "steps": _dist(steps), "metered_tokens": _dist(metered),
             "summaries_fetched": _dist(fetched), "code_reads": _dist(reads),
             "stops": dict(sorted(stops.items())),
+            "abstentions": dict(sorted(abstained.items())),
             "invalid_actions": invalid, "repeated_actions": repeated, "zero_fetch_roots": zero,
         }
     return out
@@ -454,8 +459,11 @@ def render(doc: dict[str, Any]) -> str:
                  f"{p['summaries_fetched']['median']} | {p['code_reads']['median']} | "
                  f"{p['zero_fetch_roots']} | {p['invalid_actions']} | {p['repeated_actions']} |")
     for r in ("A1", "A2"):
-        L.append(f"\n{r} stop reasons: "
-                 + ", ".join(f"{k} {v}" for k, v in doc["process"][r]["stops"].items()))
+        p = doc["process"][r]
+        L.append(f"\n{r} stop reasons: " + ", ".join(f"{k} {v}" for k, v in p["stops"].items()))
+        ab = p.get("abstentions") or {}
+        L.append(f"\n{r} abstentions by name: "
+                 + (", ".join(f"{k} {v}" for k, v in ab.items()) if ab else "none"))
 
     L += ["", f"Floor check: {doc['floor']['zero_fetch_roots']} zero-fetch roots, all equal to "
               f"their R4 cell. Caps held on every root."]
