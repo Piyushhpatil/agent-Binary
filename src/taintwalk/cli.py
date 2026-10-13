@@ -301,7 +301,7 @@ def _cmd_walk(args: argparse.Namespace) -> int:
                 caps=Caps.from_config(),
                 retry_failed=args.retry_failed,
             )
-            report = agent_report
+            report = lambda r: agent_report(r, run_dir)    # usage.json is written just before
         else:
             result = walk_program(
                 provider, prog, run_dir,

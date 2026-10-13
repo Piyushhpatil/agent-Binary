@@ -592,9 +592,25 @@ def walk_agent_program(provider: LLMProvider, prog: dict[str, Any], run_dir: Pat
     return result
 
 
-def agent_report(result: dict[str, Any]) -> int:
+def usage_line(run_dir: Path) -> str | None:
+    """walker.walk_report's `tokens (this run)` line, from the usage.json the llm layer wrote for
+    this process. Live calls are the records that were not cache hits; None without the file."""
+    f = Path(run_dir) / "usage.json"
+    if not f.is_file():
+        return None
+    doc = json.loads(f.read_text(encoding="utf-8"))
+    recs = [r for p in doc.get("providers", []) for r in p.get("records", [])]
+    live = [r for r in recs if not r.get("cache_hit") and r.get("usage")]
+    return (f"tokens (this run)  : in {sum(r['usage']['input_tokens'] for r in live)}  "
+            f"out {sum(r['usage']['output_tokens'] for r in live)}  "
+            f"model time {sum(r.get('wall_s') or 0 for r in live):.1f} s  "
+            f"cache hits {sum(bool(r.get('cache_hit')) for r in recs)} of {len(recs)} calls")
+
+
+def agent_report(result: dict[str, Any], run_dir: Path | None = None) -> int:
     """One summary line. 0 only if every root has an entry and nothing overflowed, which is
-    walk_report's rule (D-026 amendment), so both modes report success the same way."""
+    walk_report's rule (D-026 amendment), so both modes report success the same way. With
+    run_dir, also the tokens line walk_all parses (TOKENS_LINE), as the fixed walk prints."""
     fns = result["functions"]
     answered = sum(1 for f in fns.values() if f["judge"] == "ok")
     stops: dict[str, int] = {}
@@ -604,6 +620,9 @@ def agent_report(result: dict[str, Any]) -> int:
           f"calls {result['calls']}  metered {result['metered_tokens']}  "
           f"overflows {result['context_overflows']}")
     print("stops: " + ", ".join(f"{k} {v}" for k, v in sorted(stops.items())))
+    line = usage_line(run_dir) if run_dir is not None else None
+    if line:
+        print(line)
     ok = result["context_overflows"] == 0 and len(fns) == len(result["roots"])
     print("AGENT OK" if ok else "AGENT FAIL")
     return 0 if ok else 1
