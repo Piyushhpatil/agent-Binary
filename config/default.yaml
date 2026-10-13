@@ -66,7 +66,7 @@ agent:
   max_actions: 8                        # agent steps per root, finish included
   max_calls: 20                         # model calls per root: steps, callee summaries and the judge
   max_tokens_per_root: 150000           # metered: ceil(chars / token_chars_ratio) of every prompt and reply
-  max_tokens_per_run: 0                 # 0 = not set yet; fixed at the freeze from the development run
+  max_tokens_per_run: 18000000             # frozen 2026-10-13: 2 x the larger dev projection (D-042)
   read_code_max_chars: 4000             # read_code result cap, cut at whole lines
   evidence_max_chars: 12000             # = walk.callee_context_max_chars, so the judge prompt fits (D-026 test)
   token_chars_ratio: 2.0                # the Ollama preflight's chars-per-token floor (D-019)

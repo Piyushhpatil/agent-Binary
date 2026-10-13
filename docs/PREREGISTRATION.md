@@ -540,5 +540,52 @@ step and are counted.
   - from the transcripts: action counts, stop reasons, invalid and repeated actions.
 - The scorer's rules are committed before any scored verdict exists.
 
-### Deviations
-None yet.
+### Deviations and development-run record (frozen 2026-10-13, before the tag `p10-freeze`)
+
+All changes below were made on the 13 development binaries only, before any scored run, and are of
+the kinds the Data rule permits (step prompt, evidence rendering, cap values) or are bookkeeping and
+reporting that no model input depends on. The judge, the tools' contract, the scoring rules and the
+data split are unchanged.
+
+**1. Step prompt v1 -> v2 (`AGENT_PROMPT_VERSION = 2`, commit `3eb0d8f`).** In the v1 development
+run, A2 gathered nothing on 35 of 35 roots: every non-finish action was refused. The step prompt
+showed callees only by their Ghidra names (`FUN_00101c04`), whose number carries the image base,
+while the tools take program.json addresses (`0x1c04`, D-016). v2 lists each direct callee as
+`target 0x1c04 = FUN_00101c04 (status)`, tells the model to copy targets from those lines, and names
+the valid targets when an action is refused. v2 development run: 4 invalid actions in 137 steps, 0 of
+35 roots with nothing gathered. The v1 runs are kept in `runs/p10-dev-v1`. A constrained target
+schema was considered and not adopted: it would change the pre-registered action schema and remove
+the invalid-action count.
+
+**2. Bookkeeping (commits `3eb0d8f`, `4150ae3`).** `cache_hit` was removed from `agent.json` (it
+differs between a live run and its replay), and each root now records `call_keys`, the cache key of
+every model call it made. Neither is a model input. Both policies replay byte for byte (summaries.json
+and agent.json, 13/13), and verdicts were unchanged by either change.
+
+**3. Reporting, all before any scored verdict (commits `04c8aae`, `92538f8`, `cc02420`, `4150ae3`).**
+Real-code D-040 pair outcomes through Phase 9's own loaders (reproducing Phase 9's R4/R5 pairs 12/12);
+abstentions named by their failure; agent mode prints the `tokens (this run)` line; the scorer reads
+metrics' nested cell counts; a cost table.
+
+**4. Deviation: model time is reported per run, not per root.** The pre-registration asks for real
+tokens and model time per root, in full and beyond R4. Real and metered tokens are reported per root
+as registered: real tokens are read from the cache entry of every call a root made, so a cache hit
+costs what its live call cost (cost as from an empty cache), and "beyond R4" subtracts the root's own
+R4 call. The cache stores no timing, so model time is the per-run sum of the programs'
+`tokens (this run)` lines; a resumed program counts only its last process.
+
+**5. Cap values: unchanged.** 8 actions, 20 model calls and 150,000 metered tokens per root;
+read_code 4,000 characters; evidence 12,000 characters.
+
+**6. Run ceiling: `max_tokens_per_run = 18,000,000`.** Rule: twice the larger development projection
+to the 601 scored Juliet roots, rounded up to the next million. Development means per root: A1 13,584
+and A2 14,566 metered tokens, projecting to 8,164,516 and 8,754,457. The same value serves the
+real-code runs, where the per-root cap already bounds a run at 150,000 x 24 = 3,600,000.
+
+**7. Runtime rule: the full scored set runs.** Development A2 took about 21.7 s per root over its 26
+live roots, projecting about 3.6 h for A2 on the scored Juliet set, under 24 h per policy. No
+subsample is drawn; seed 20261006 is unused.
+
+**Development observations (not results).** A2 read code 64 times and summaries 10 times over the 35
+development roots. One judge call ended at its output budget (`max_tokens`; tw-0091 0x18dd), a named
+abstention under the existing rule. No development verdict was used to change anything above.
