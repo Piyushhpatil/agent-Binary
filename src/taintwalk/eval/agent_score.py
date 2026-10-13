@@ -24,6 +24,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
+import re
 import statistics
 import sys
 from pathlib import Path
@@ -238,6 +240,137 @@ def process_table(agent_root: Path, cases: list[tuple[str, str, list[str]]]) -> 
     return out
 
 
+# --------------------------------------------------------------------------- cost (as from an empty cache)
+
+# walk_all.TOKENS_LINE, duplicated so the scorer never imports analysis/ code that may load llm.
+LOG_TOKENS = re.compile(r"^tokens \(this run\)\s*:\s*in (\d+)\s+out (\d+)\s+model time ([\d.]+) s", re.M)
+
+
+def cache_dir() -> Path:
+    """The llm layer's disk cache, from config/providers.yaml (cache_dir)."""
+    import yaml
+    cfg = yaml.safe_load((REPO_ROOT / "config" / "providers.yaml").read_text(encoding="utf-8"))
+    return REPO_ROOT / cfg["cache_dir"]
+
+
+def _entry_tokens(cache: Path, key: str) -> int:
+    """Input + output tokens of the live call that wrote this cache entry. A cache hit replays the
+    entry, so this is the call's cost as if the cache had been empty."""
+    f = Path(cache) / key[:2] / f"{key}.json"
+    if not f.is_file():
+        raise AgentScoreError(f"cost: no cache entry for {key[:12]} ({f})")
+    u = _read_json(f).get("usage") or {}
+    return int(u.get("input_tokens") or 0) + int(u.get("output_tokens") or 0)
+
+
+def _system_text(system: Path, want_sha: str) -> str:
+    """The system prompt text whose sha256 the prompt file recorded (trailing newline tolerated)."""
+    import hashlib
+    raw = Path(system).read_text(encoding="utf-8")
+    for cand in (raw, raw.rstrip("\n")):
+        if hashlib.sha256(cand.encode("utf-8")).hexdigest() == want_sha:
+            return cand
+    raise AgentScoreError(f"cost: {system} does not match the prompt's system_sha256")
+
+
+def _metered(prompt_doc: dict[str, Any], system_text: str, ratio: float) -> int:
+    """analysis.agent.meter over a persisted prompt file, re-implemented so no llm module loads."""
+    replies = sum(len((a.get("text") if isinstance(a, dict) else "") or "")
+                  for a in prompt_doc.get("attempts", []))
+    return math.ceil((len(system_text) + 1 + len(prompt_doc["user"]) + replies) / ratio)
+
+
+def juliet_r4(walk_root: Path):
+    """R4 files for a Juliet root: the Phase 8 walk's --with-baseline rows (D-030)."""
+    def files(case_id: str, sha: str, addr: str) -> tuple[Path, Path, Path]:
+        b = Path(walk_root) / case_id / "baseline"
+        s = _stem(sha, addr)
+        return b / "summaries" / f"{s}.json", b / "prompts" / f"{s}.json", b / "system.txt"
+    return files
+
+
+def real_r4(r4_dir: Path):
+    """R4 files for a real-code root: Phase 9's analyze-one run at the roots (D-038)."""
+    def files(case_id: str, sha: str, addr: str) -> tuple[Path, Path, Path]:
+        s = _stem(sha, addr)
+        r = Path(r4_dir)
+        return r / "summaries" / f"{s}.json", r / "prompts" / f"{s}.json", r / "system.txt"
+    return files
+
+
+def cost_table(agent_root: Path, cases: list[tuple[str, str, list[str]]], r4_files,
+               cache: Path | None = None) -> dict[str, Any]:
+    """Per root, per policy: real tokens (from the cache entries of every call the root made) and
+    metered tokens, in full and beyond R4 (minus the root's own R4 call). Model time is not in the
+    cache, so it is summed per run from the program logs' tokens lines. Fails closed on a missing
+    key, entry or R4 file, and on an A1 zero-fetch root whose cost beyond R4 is not exactly 0."""
+    cache = Path(cache) if cache is not None else cache_dir()
+    out: dict[str, Any] = {}
+    for rung, policy in POLICIES:
+        cols: dict[str, list[int]] = {"real_full": [], "real_beyond": [],
+                                      "metered_full": [], "metered_beyond": []}
+        model_s = 0.0
+        logs = 0
+        zero_checked = 0
+        for case_id, sha, roots in cases:
+            d = Path(agent_root) / policy / case_id
+            doc = _read_json(d / "agent.json")
+            ratio = float(doc["caps"]["token_chars_ratio"])
+            for a in roots:
+                f = doc["functions"][a]
+                keys = f.get("call_keys")
+                if keys is None:
+                    raise AgentScoreError(f"cost: {rung} {case_id} {a}: agent.json has no call_keys")
+                row_p, prompt_p, sys_p = r4_files(case_id, sha, a)
+                r4_key = _read_json(row_p).get("cache_key")
+                if not r4_key:
+                    raise AgentScoreError(f"cost: no R4 cache_key in {row_p}")
+                pdoc = _read_json(prompt_p)
+                r4_real = _entry_tokens(cache, r4_key)
+                r4_met = _metered(pdoc, _system_text(sys_p, pdoc["system_sha256"]), ratio)
+                real = sum(_entry_tokens(cache, k) for k in keys)
+                met = int(f["metered_tokens"])
+                cols["real_full"].append(real)
+                cols["real_beyond"].append(real - r4_real)
+                cols["metered_full"].append(met)
+                cols["metered_beyond"].append(met - r4_met)
+                if (policy == "scripted" and not f["summaries_fetched"] and not f["code_read"]
+                        and f.get("judge") != "agent:budget"):
+                    zero_checked += 1
+                    if real != r4_real or met != r4_met:
+                        raise AgentScoreError(
+                            f"cost: A1 zero-fetch root {case_id} {a} costs more than R4 "
+                            f"(real {real} vs {r4_real}, metered {met} vs {r4_met})")
+            log = Path(agent_root) / policy / "logs" / f"{case_id}.log"
+            m = LOG_TOKENS.search(log.read_text(encoding="utf-8")) if log.is_file() else None
+            if m:
+                logs += 1
+                model_s += float(m.group(3))
+        out[rung] = {"policy": policy, "roots": len(cols["real_full"]),
+                     **{k: _dist(v) for k, v in cols.items()},
+                     "model_s_logs": round(model_s, 1), "programs_with_tokens_line": logs,
+                     "programs": len(cases), "a1_zero_fetch_checked": zero_checked}
+    return out
+
+
+def render_cost(cost: dict[str, Any]) -> list[str]:
+    L = ["", "### Cost per root (as from an empty cache; beyond R4 = minus the root's own R4 call)", "",
+         "| Rung | Roots | Real tokens med/p90/max | Real beyond R4 | Metered med/p90/max | "
+         "Metered beyond R4 | Model time, s (logs) |",
+         "|---|---|---|---|---|---|---|"]
+    for r in ("A1", "A2"):
+        c = cost[r]
+        L.append(f"| {r} | {c['roots']} | {_d(c['real_full'])} | {_d(c['real_beyond'])} | "
+                 f"{_d(c['metered_full'])} | {_d(c['metered_beyond'])} | {c['model_s_logs']} |")
+    a1, a2 = cost["A1"], cost["A2"]
+    L += ["", f"Real tokens are read from the cache entry of every call a root made, so a cache hit "
+              f"costs what its live call cost. Model time is not in the cache: it is the sum of the "
+              f"programs' `tokens (this run)` lines ({a2['programs_with_tokens_line']} of "
+              f"{a2['programs']} A2 programs), so a resumed program counts only its last process. "
+              f"A1 zero-fetch roots costing exactly R4: {a1['a1_zero_fetch_checked']}."]
+    return L
+
+
 # --------------------------------------------------------------------------- cells
 
 def _cells(scored: dict[str, Any], rung: str) -> dict[str, Any]:
@@ -378,7 +511,8 @@ def score_real(agent_root: Path, *, manifest: dict[str, Any], programs_dir: Path
             raise AgentScoreError(f"real {rung}: runs differ in policy or agent prompt version ({len(ids)})")
     floor = check_floor(agent_root, cases, tables)
     return {**real_pairs(roots, outcomes, ctx), "floor": floor,
-            "process": process_table(agent_root, cases)}
+            "process": process_table(agent_root, cases),
+            "cost": cost_table(agent_root, cases, real_r4(r4_dir))}
 
 
 # --------------------------------------------------------------------------- render
@@ -424,6 +558,8 @@ def render_real(rd: dict[str, Any]) -> list[str]:
                  + " | ".join(f"{SHORT[p['pre'][r]]}/{SHORT[p['post'][r]]}" for r in RUNGS) + " |")
     L += ["", f"Real-code floor check: {rd['floor']['zero_fetch_roots']} zero-fetch roots, all equal "
               f"to their R4 cell. Caps held on every root."]
+    if rd.get("cost"):
+        L += render_cost(rd["cost"])
     return L
 
 
@@ -467,6 +603,8 @@ def render(doc: dict[str, Any]) -> str:
 
     L += ["", f"Floor check: {doc['floor']['zero_fetch_roots']} zero-fetch roots, all equal to "
               f"their R4 cell. Caps held on every root."]
+    if doc.get("cost"):
+        L += render_cost(doc["cost"])
     if doc.get("real"):
         L += render_real(doc["real"])
     L += ["", END, ""]
@@ -526,6 +664,7 @@ def score(agent_root: Path, walk_root: Path, cases: list[tuple[str, str, list[st
             "roots": len(next(iter(keys.values()))),
             "cells": {r: _cells(scored[r], r) for r in RUNGS},
             "tests": tests, "process": process_table(agent_root, cases), "floor": floor,
+            "cost": cost_table(agent_root, cases, juliet_r4(walk_root)),
             "rungs": {r: {"definition": defs[r], "identity": scored[r]["identity"]} for r in RUNGS}}
 
 

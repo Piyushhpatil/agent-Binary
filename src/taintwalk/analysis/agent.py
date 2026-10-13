@@ -167,6 +167,7 @@ class Decision:
     calls: int = 0
     failure: str = ""
     overflow: bool = False
+    key: str = ""             # the call's cache key: the same live and on replay, so safe to record
 
 
 def _attempt_text(a: Any) -> str:
@@ -318,8 +319,8 @@ class LLMPolicy:
         metered = meter(AGENT_SYSTEM, user,
                         [_attempt_text(a) for a in (getattr(c, "attempts", None) or [])], ratio=ratio)
         if not c.ok:
-            return Decision(None, metered, 1, failure=c.failure or "unknown")
-        return Decision(AgentAction.model_validate(c.data), metered, 1)
+            return Decision(None, metered, 1, failure=c.failure or "unknown", key=c.key or "")
+        return Decision(AgentAction.model_validate(c.data), metered, 1, key=c.key or "")
 
 
 def _abstention_row(prog: dict[str, Any], addr: str, name: str, failure: str,
@@ -355,6 +356,7 @@ def run_agent(provider: LLMProvider, prog: dict[str, Any], addr: str, run_dir: P
     invalid = 0
     repeated = 0
     stop = ""
+    call_keys: list[str] = []     # every model call for this root, in order (cost from the cache)
 
     while True:
         if len(state.steps) >= caps.max_actions:
@@ -369,6 +371,8 @@ def run_agent(provider: LLMProvider, prog: dict[str, Any], addr: str, run_dir: P
 
         d = policy.choose(state)
         calls += d.calls
+        if d.key:
+            call_keys.append(d.key)
         metered += d.metered
         idx = len(state.steps) + 1
 
@@ -412,6 +416,8 @@ def run_agent(provider: LLMProvider, prog: dict[str, Any], addr: str, run_dir: P
                 state.fetched[act.target] = view
                 if row is not None:
                     calls += 1
+                    if row.get("cache_key"):
+                        call_keys.append(row["cache_key"])
                     step_calls += 1
                     m = meter_prompt_file(run_dir / "prompts" / f"{stem(sha, act.target)}.json",
                                           ratio=caps.token_chars_ratio)
@@ -464,8 +470,11 @@ def run_agent(provider: LLMProvider, prog: dict[str, Any], addr: str, run_dir: P
                                      ratio=caps.token_chars_ratio)
         agent_fields["calls"] = calls
         agent_fields["metered_tokens"] = metered
+        if row.get("cache_key"):
+            call_keys.append(row["cache_key"])
         agent_fields["judge"] = row.get("status") or "unknown"
 
+    agent_fields["call_keys"] = list(call_keys)
     if extra:
         row.update(extra)
 
@@ -480,6 +489,7 @@ def run_agent(provider: LLMProvider, prog: dict[str, Any], addr: str, run_dir: P
         "stop": agent_fields["stop"],
         "steps": [s.as_dict() for s in state.steps],
         "calls": agent_fields["calls"],
+        "call_keys": agent_fields["call_keys"],
         "metered_tokens": agent_fields["metered_tokens"],
         "evidence_chars": len(evidence),
         "judge": agent_fields.get("judge", ""),
@@ -566,6 +576,7 @@ def walk_agent_program(provider: LLMProvider, prog: dict[str, Any], run_dir: Pat
             "code_read": a.get("code_read", []),
             "evidence_chars": a.get("evidence_chars", 0),
             "judge": a.get("judge", ""),
+            "call_keys": a.get("call_keys", []),
         }
 
     result = {

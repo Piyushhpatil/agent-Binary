@@ -346,3 +346,75 @@ def test_process_table_names_abstentions(tmp_path):
     s = render({**DOC, "process": t})
     assert "A2 abstentions by name: agent:budget 1, max_tokens 1" in s
     assert "A1 abstentions by name: none" in s
+
+# --------------------------------------------------------------------------- cost (10e)
+
+def _cost_fixture(tmp_path, *, a1_extra_call=False):
+    """One root. R4 = one call of 100 tokens. A1 fetched nothing (its judge call IS the R4 call);
+    A2 made one step call (40 tokens) and a judge call (150)."""
+    import hashlib
+    cache = tmp_path / "cache"
+
+    def entry(key, tokens):
+        (cache / key[:2]).mkdir(parents=True, exist_ok=True)
+        (cache / key[:2] / f"{key}.json").write_text(json.dumps(
+            {"usage": {"input_tokens": tokens - 10, "output_tokens": 10}}), encoding="utf-8")
+
+    r4k, stepk, judgek, extrak = "a" * 64, "b" * 64, "c" * 64, "d" * 64
+    for k, n in ((r4k, 100), (stepk, 40), (judgek, 150), (extrak, 7)):
+        entry(k, n)
+    sha = "0" * 64
+    system = "SYSTEM PROMPT"
+    b = tmp_path / "walk" / "tw-0015" / "baseline"
+    (b / "summaries").mkdir(parents=True)
+    (b / "prompts").mkdir()
+    (b / "system.txt").write_text(system + "\n", encoding="utf-8")
+    stem = A._stem(sha, "0x1000")
+    (b / "summaries" / f"{stem}.json").write_text(json.dumps({"cache_key": r4k}), encoding="utf-8")
+    user = "u" * 85
+    (b / "prompts" / f"{stem}.json").write_text(json.dumps({
+        "user": user, "attempts": [{"text": "r" * 100}],
+        "system_sha256": hashlib.sha256(system.encode()).hexdigest()}), encoding="utf-8")
+    r4_met = -(-(len(system) + 1 + len(user) + 100) // 2)          # ceil(199 / 2) = 100
+    base = {**_fn(), "judge": "ok", "status": "ok", "failure": ""}
+    a1 = {**base, "metered_tokens": r4_met + (5 if a1_extra_call else 0),
+          "call_keys": [r4k] + ([extrak] if a1_extra_call else [])}
+    a2 = {**base, "metered_tokens": 300, "code_read": ["0x1100"], "call_keys": [stepk, judgek]}
+
+    def doc(fn):
+        return {"caps": {"max_tokens_per_root": 150000, "token_chars_ratio": 2.0},
+                "functions": {"0x1000": fn}}
+
+    _write_agent_dirs(tmp_path / "agent", {"scripted": doc(a1), "llm": doc(a2)})
+    logs = tmp_path / "agent" / "llm" / "logs"
+    logs.mkdir()
+    (logs / "tw-0015.log").write_text(
+        "tokens (this run)  : in 5  out 2  model time 12.5 s  cache hits 0 of 2 calls\n",
+        encoding="utf-8")
+    return tmp_path / "agent", [("tw-0015", sha, ["0x1000"])], A.juliet_r4(tmp_path / "walk"), cache
+
+
+def test_cost_table_full_and_beyond_r4(tmp_path):
+    root, cases, r4, cache = _cost_fixture(tmp_path)
+    c = A.cost_table(root, cases, r4, cache)
+    assert c["A1"]["real_full"]["max"] == 100 and c["A1"]["real_beyond"]["max"] == 0
+    assert c["A1"]["metered_beyond"]["max"] == 0 and c["A1"]["a1_zero_fetch_checked"] == 1
+    assert c["A2"]["real_full"]["max"] == 190 and c["A2"]["real_beyond"]["max"] == 90
+    assert c["A2"]["metered_full"]["max"] == 300 and c["A2"]["metered_beyond"]["max"] == 200
+    assert c["A2"]["model_s_logs"] == 12.5 and c["A2"]["programs_with_tokens_line"] == 1
+    s = render({**DOC, "cost": c})
+    assert "### Cost per root" in s and "| A2 | 1 | 190/190/190 | 90/90/90 |" in s
+
+
+def test_a1_zero_fetch_root_costing_more_than_r4_fails_closed(tmp_path):
+    root, cases, r4, cache = _cost_fixture(tmp_path, a1_extra_call=True)
+    with pytest.raises(AgentScoreError, match="A1 zero-fetch root"):
+        A.cost_table(root, cases, r4, cache)
+
+
+def test_missing_cache_entry_fails_closed(tmp_path):
+    import shutil
+    root, cases, r4, cache = _cost_fixture(tmp_path)
+    shutil.rmtree(cache / "cc")
+    with pytest.raises(AgentScoreError, match="no cache entry"):
+        A.cost_table(root, cases, r4, cache)
