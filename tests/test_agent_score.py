@@ -418,3 +418,25 @@ def test_missing_cache_entry_fails_closed(tmp_path):
     shutil.rmtree(cache / "cc")
     with pytest.raises(AgentScoreError, match="no cache entry"):
         A.cost_table(root, cases, r4, cache)
+
+
+# --------------------------------------------------------------------------- R4 lookup (13)
+
+def test_r4_row_path_baseline_then_walk_row(tmp_path):
+    """baseline/ wins; a root without a callee block falls back to the walk row; a walk row WITH
+    callee context is never taken as R4."""
+    sha = "0" * 64
+    stem = A._stem(sha, "0x1000")
+    (tmp_path / "summaries").mkdir()
+    w = tmp_path / "summaries" / f"{stem}.json"
+    w.write_text(json.dumps({"walk": {"context_chars": 0}, "record": None}), encoding="utf-8")
+    assert A.r4_row_path(tmp_path, sha, "0x1000") == w
+    w.write_text(json.dumps({"walk": {"context_chars": 812}, "record": None}), encoding="utf-8")
+    with pytest.raises(AgentScoreError, match="has callee context"):
+        A.r4_row_path(tmp_path, sha, "0x1000")
+    (tmp_path / "baseline" / "summaries").mkdir(parents=True)
+    b = tmp_path / "baseline" / "summaries" / f"{stem}.json"
+    b.write_text(json.dumps({"record": None}), encoding="utf-8")
+    assert A.r4_row_path(tmp_path, sha, "0x1000") == b
+    with pytest.raises(AgentScoreError, match="no R4 row"):
+        A.r4_row_path(tmp_path, sha, "0x2000")

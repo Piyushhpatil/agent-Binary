@@ -104,14 +104,30 @@ def walk_rows(run_dir: Path, roots: list[str]) -> dict[str, dict[str, Any]]:
     return {a: _row(doc[a]) for a in roots}
 
 
+def r4_row_path(run_dir: Path, sha: str, addr: str) -> Path:
+    """Where R4's row for one Juliet root lives in a Phase 8 run dir. `walk --with-baseline` writes a
+    baseline/ row only for functions with a callee block; for the others the walk prompt is the
+    no-context prompt (one cache entry, D-026/D-030 stratum S0), so R4's row is the walk's own row.
+    Fails closed when that walk row has callee context, because it would then not be R4."""
+    stem = _stem(sha, addr)
+    b = Path(run_dir) / "baseline" / "summaries" / f"{stem}.json"
+    if b.is_file():
+        return b
+    w = Path(run_dir) / "summaries" / f"{stem}.json"
+    if not w.is_file():
+        raise AgentScoreError(f"no R4 row for {addr}: neither {b} nor {w}")
+    ctx = (_read_json(w).get("walk") or {}).get("context_chars")
+    if ctx != 0:
+        raise AgentScoreError(f"no baseline row for {addr}, and its walk row has callee context ({ctx}): {w}")
+    return w
+
+
 def baseline_rows(run_dir: Path, sha: str, roots: list[str]) -> dict[str, dict[str, Any]]:
-    """R4 rows: the per-function no-context summaries `walk --with-baseline` wrote (D-030)."""
+    """R4 rows: the per-function no-context summaries of the Phase 8 walk (D-030), read from
+    baseline/ or, for a root without a callee block, from the walk's own row (r4_row_path)."""
     out: dict[str, dict[str, Any]] = {}
     for a in roots:
-        f = Path(run_dir) / "baseline" / "summaries" / f"{_stem(sha, a)}.json"
-        if not f.is_file():
-            raise AgentScoreError(f"no R4 row for {a}: {f}")
-        out[a] = _row(_read_json(f).get("record"))
+        out[a] = _row(_read_json(r4_row_path(run_dir, sha, a)).get("record"))
     return out
 
 
@@ -281,11 +297,13 @@ def _metered(prompt_doc: dict[str, Any], system_text: str, ratio: float) -> int:
 
 
 def juliet_r4(walk_root: Path):
-    """R4 files for a Juliet root: the Phase 8 walk's --with-baseline rows (D-030)."""
+    """R4 files for a Juliet root: the Phase 8 walk's R4 row, prompt and system text, from baseline/
+    or, for a root without a callee block, from the walk itself (r4_row_path)."""
     def files(case_id: str, sha: str, addr: str) -> tuple[Path, Path, Path]:
-        b = Path(walk_root) / case_id / "baseline"
+        row = r4_row_path(Path(walk_root) / case_id, sha, addr)
+        base = row.parent.parent
         s = _stem(sha, addr)
-        return b / "summaries" / f"{s}.json", b / "prompts" / f"{s}.json", b / "system.txt"
+        return row, base / "prompts" / f"{s}.json", base / "system.txt"
     return files
 
 

@@ -589,3 +589,14 @@ subsample is drawn; seed 20261006 is unused.
 **Development observations (not results).** A2 read code 64 times and summaries 10 times over the 35
 development roots. One judge call ended at its output budget (`max_tokens`; tw-0091 0x18dd), a named
 abstention under the existing rule. No development verdict was used to change anything above.
+
+### Deviation (2026-10-15, after the scored runs, before any scored number was computed or read): R4 lookup
+
+The first scoring run failed closed (`no R4 row for 0x19dd`, tw-0001) before writing any output. Cause:
+`walk --with-baseline` writes a separate no-context row only for functions that have a callee block;
+for the others the walk prompt is the no-context prompt, so Phase 8 kept one cache entry and one row,
+the walk's own (D-026, D-030; stratum S0). The scorer looked only in `baseline/`, and the development
+slice never exposed it (none of its 35 roots lacks a callee block). Fix: for such a root the scorer
+reads R4's row, prompt and system text from the walk itself, and fails closed unless that row carries
+no callee context. 17 of the 601 scored roots are affected. This changes where R4 is read from, not
+what R4 is: no scoring rule, cap, prompt, agent code or run changed, and nothing was re-run.
