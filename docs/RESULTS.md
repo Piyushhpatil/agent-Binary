@@ -439,3 +439,111 @@ Pre/post outcome per rung: F flagged, C clear, A abstained.
 | rp-13 | CVE-2021-45985 | lua | luaD_pretailcall |  | C/C | C/C | F/F | A/A | A/A |
 | rp-14 | CVE-2022-28805 | lua | singlevar |  | C/C | C/C | F/F | F/F | A/F |
 <!-- phase9:end -->
+
+<!-- phase10:begin -->
+
+## Phase 10: agentic evidence gathering (D-042)
+
+Status: scored set, local model only (D-034)
+
+One judge for every rung; only the evidence block differs. R4 no evidence, A1 scripted reads, A2 agent-chosen reads, R5 the fixed walk.
+
+| Rung | TP | FN | FP | TN | Abstain | Recall | Specificity | Precision | Coverage |
+|---|---|---|---|---|---|---|---|---|---|
+| R4 | 127 | 100 | 118 | 254 | 2 | 0.559 | 0.679 | 0.518 | 0.997 |
+| A1 | 169 | 57 | 167 | 206 | 2 | 0.744 | 0.551 | 0.503 | 0.997 |
+| A2 | 150 | 75 | 138 | 233 | 5 | 0.661 | 0.623 | 0.521 | 0.992 |
+| R5 | 185 | 42 | 197 | 177 | 0 | 0.815 | 0.473 | 0.484 | 1.000 |
+
+### Pre-registered tests (6, Holm at 0.05)
+
+| Test | Label | n | A right | B right | A only | B only | p | p (Holm) | Reject |
+|---|---|---|---|---|---|---|---|---|---|
+| A2 vs A1 | bad | 227 | 150 | 169 | 21 | 40 | 0.0204 | 0.040829 | yes |
+| A2 vs A1 | good | 374 | 233 | 206 | 64 | 37 | 0.0093 | 0.034218 | yes |
+| A2 vs R4 | bad | 227 | 150 | 127 | 47 | 24 | 0.0086 | 0.034218 | yes |
+| A2 vs R4 | good | 374 | 233 | 254 | 33 | 54 | 0.0314 | 0.040829 | yes |
+| A2 vs R5 | bad | 227 | 150 | 185 | 19 | 54 | 0.0001 | 0.000253 | yes |
+| A2 vs R5 | good | 374 | 233 | 177 | 79 | 23 | 0.0000 | 0.0 | yes |
+
+### Process and cost (from the transcripts)
+
+| Rung | Roots | Steps med/p90/max | Metered med/p90/max | Summaries med | Code reads med | Zero-fetch | Invalid | Repeated |
+|---|---|---|---|---|---|---|---|---|
+| A1 | 601 | 2/3/4 | 12760/18910/25781 | 1 | 0 | 17 | 0 | 0 |
+| A2 | 601 | 4/7/8 | 12861/23826/39522 | 0 | 2 | 29 | 28 | 127 |
+
+A1 stop reasons: finish 601
+
+A1 abstentions by name: max_tokens 2
+
+A2 stop reasons: finish 556, max_actions 36, step_failed 9
+
+A2 abstentions by name: max_tokens 5
+
+Floor check: 46 zero-fetch roots, all equal to their R4 cell. Caps held on every root.
+
+### Cost per root (as from an empty cache; beyond R4 = minus the root's own R4 call)
+
+| Rung | Roots | Real tokens med/p90/max | Real beyond R4 | Metered med/p90/max | Metered beyond R4 | Model time, s (logs) |
+|---|---|---|---|---|---|---|
+| A1 | 601 | 7909/11695/18257 | 3992/7540/14713 | 12760/18910/25781 | 6498/12325/19528 | 3516.9 |
+| A2 | 601 | 8591/16024/25548 | 4810/11849/21573 | 12861/23826/39522 | 6768/17765/33148 | 10793.6 |
+
+Real tokens are read from the cache entry of every call a root made, so a cache hit costs what its live call cost. Model time is not in the cache: it is the sum of the programs' `tokens (this run)` lines (227 of 227 A2 programs), so a resumed program counts only its last process. A1 zero-fetch roots costing exactly R4: 17.
+
+### Real code: 12 vulnerable/patched pairs, 24 roots (D-040)
+
+The same judge and rungs at the Phase 9 roots. A pair is correct only if its pre-fix root is flagged and its post-fix root is clear. Descriptive; no tests (D-042).
+
+| Rung | TP | FN | FP | TN | Abstain | Recall | Specificity | Precision | Coverage |
+|---|---|---|---|---|---|---|---|---|---|
+| R4 | 10 | 0 | 9 | 0 | 5 | 0.833 | 0.000 | 0.526 | 0.792 |
+| A1 | 9 | 0 | 11 | 0 | 4 | 0.750 | 0.000 | 0.450 | 0.833 |
+| A2 | 8 | 0 | 9 | 0 | 7 | 0.667 | 0.000 | 0.471 | 0.708 |
+| R5 | 8 | 0 | 8 | 0 | 8 | 0.667 | 0.000 | 0.500 | 0.667 |
+
+| Group | Rung | Pairs | Pair-correct | Both vulnerable | Both clear | Reversed | Abstained |
+|---|---|---|---|---|---|---|---|
+| all | R4 | 12 | 0 | 9 | 0 | 0 | 3 |
+| all | A1 | 12 | 0 | 9 | 0 | 0 | 3 |
+| all | A2 | 12 | 0 | 8 | 0 | 0 | 4 |
+| all | R5 | 12 | 0 | 7 | 0 | 0 | 5 |
+| with_callees | R4 | 9 | 0 | 6 | 0 | 0 | 3 |
+| with_callees | A1 | 9 | 0 | 6 | 0 | 0 | 3 |
+| with_callees | A2 | 9 | 0 | 5 | 0 | 0 | 4 |
+| with_callees | R5 | 9 | 0 | 4 | 0 | 0 | 5 |
+| no_callee | R4 | 3 | 0 | 3 | 0 | 0 | 0 |
+| no_callee | A1 | 3 | 0 | 3 | 0 | 0 | 0 |
+| no_callee | A2 | 3 | 0 | 3 | 0 | 0 | 0 |
+| no_callee | R5 | 3 | 0 | 3 | 0 | 0 | 0 |
+
+Pre/post outcome per rung: F flagged, C clear, A abstained.
+
+| Pair | CVE | Project | Function | No callee | R4 | A1 | A2 | R5 |
+|---|---|---|---|---|---|---|---|---|
+| rp-01 | CVE-2016-7564 | mujs | Fp_toString |  | F/F | F/F | F/F | F/F |
+| rp-02 | CVE-2017-5627 | mujs | jsR_setproperty |  | A/A | A/F | A/A | F/A |
+| rp-03 | CVE-2017-5628 | mujs | MakeDay |  | F/F | F/F | F/F | F/F |
+| rp-04 | CVE-2021-33797 | mujs | js_strtod | yes | F/F | F/F | F/F | F/F |
+| rp-05 | CVE-2018-11536 | md4c | md_split_simple_pairing_mark | yes | F/F | F/F | F/F | F/F |
+| rp-06 | CVE-2018-11546 | md4c | md_is_named_entity_contents | yes | F/F | F/F | F/F | F/F |
+| rp-07 | CVE-2018-11547 | md4c | md_is_link_label |  | F/A | A/A | F/F | A/A |
+| rp-08 | CVE-2018-11490 | giflib | DGifDecompressLine |  | F/F | A/F | A/A | A/A |
+| rp-10 | CVE-2026-26740 | giflib | EGifGCBToSavedExtension |  | F/F | F/F | A/A | F/F |
+| rp-12 | CVE-2020-24342 | lua | luaD_callnoyield |  | F/F | F/F | F/F | F/F |
+| rp-13 | CVE-2021-45985 | lua | luaD_pretailcall |  | A/A | F/F | F/F | A/A |
+| rp-14 | CVE-2022-28805 | lua | singlevar |  | F/F | F/F | A/F | A/F |
+
+Real-code floor check: 12 zero-fetch roots, all equal to their R4 cell. Caps held on every root.
+
+### Cost per root (as from an empty cache; beyond R4 = minus the root's own R4 call)
+
+| Rung | Roots | Real tokens med/p90/max | Real beyond R4 | Metered med/p90/max | Metered beyond R4 | Model time, s (logs) |
+|---|---|---|---|---|---|---|
+| A1 | 24 | 15180.0/40670/50178 | 10484.5/35457/43302 | 24375.5/63971/71029 | 16466.5/56143/61249 | 1406.1 |
+| A2 | 24 | 22838.0/42540/54712 | 18088.0/35855/49684 | 32310.0/54671/80329 | 24946.5/45458/72766 | 1653.8 |
+
+Real tokens are read from the cache entry of every call a root made, so a cache hit costs what its live call cost. Model time is not in the cache: it is the sum of the programs' `tokens (this run)` lines (22 of 22 A2 programs), so a resumed program counts only its last process. A1 zero-fetch roots costing exactly R4: 6.
+
+<!-- phase10:end -->
