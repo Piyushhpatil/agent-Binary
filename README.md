@@ -55,6 +55,29 @@ whole point of the walk, and this is its main failure mode: in the coded error a
 positives on Juliet were a caller inheriting a callee's verdict like this. (Neither function is a scored path
 root; the example shows the mechanism, not a scored result.)
 
+One call level up, the same summary helped. `FUN_00101aba` calls `FUN_00101c23` and is a **scored path root**
+on a safe path. Without context the model called it a stack overflow (wrong). With the same callee summary
+in view, the walk cleared it (right):
+
+```text
+explain 0x1aba FUN_00101aba   binary 866ee1a626c5
+status        : ok   iteration 0
+callees       : 0x1c23 ok
+walk verdict  : not vulnerable
+no context    : vulnerable, out_of_bounds_access stack/write/past_end
+--- callee block injected into the prompt ---
+FUN_00101c23, called on line 14
+  params: 0 pointer (undefined8)
+  flows: param 0 -> sink:0
+  sinks: sink:0 call_arg FUN_00101cfa, unguarded
+  returns taint: no
+  verdict: vulnerable, os_command_injection
+--- end ---
+```
+
+The same mechanism cut both ways inside one call chain. Across the whole corpus, the losses outweighed the
+wins on safe code: specificity fell from 0.674 without context to 0.477 with it (see Results).
+
 ## Results
 
 ### Juliet: 240 stripped binaries, 13 CWE classes, 636 scored functions
