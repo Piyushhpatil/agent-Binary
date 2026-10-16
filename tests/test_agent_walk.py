@@ -8,15 +8,14 @@ import pathlib
 
 import pytest
 from llm_fakes import FakeProvider, ok_response
+from corpus_data import corpus_sha
 
 from taintwalk import cli
 from taintwalk.analysis.agent import Caps, agent_report, walk_agent_program
 from taintwalk.analysis.walk_all import walk_command
 from taintwalk.config import load_config
 
-SHA = json.loads(
-    (pathlib.Path(load_config()["extract"]["out_dir"]) / "programs" / "tw-0015.json")
-    .read_text(encoding="utf-8"))["binary"]["sha256"]
+SHA = corpus_sha("tw-0015")  # committed manifest: same value, needs no runs/ data (D-043)
 
 CAPS = Caps(8, 20, 150000, 4000, 12000, 2.0)
 

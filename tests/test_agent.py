@@ -9,6 +9,7 @@ import pathlib
 
 import pytest
 from llm_fakes import FakeProvider, ok_response
+from corpus_data import corpus_sha
 
 from taintwalk.analysis.agent import (
     Caps, LLMPolicy, ScriptedPolicy, build_evidence, run_agent,
@@ -17,9 +18,7 @@ from taintwalk.analysis.analyze_one import analyze_function, stem
 from taintwalk.config import load_config
 from taintwalk.util.leakcheck import LeakError
 
-SHA = json.loads(
-    (pathlib.Path(load_config()["extract"]["out_dir"]) / "programs" / "tw-0015.json")
-    .read_text(encoding="utf-8"))["binary"]["sha256"]
+SHA = corpus_sha("tw-0015")  # committed manifest: same value, needs no runs/ data (D-043)
 
 CAPS = Caps(max_actions=8, max_calls=20, max_tokens_per_root=150000,
             read_code_max_chars=4000, evidence_max_chars=12000, token_chars_ratio=2.0)

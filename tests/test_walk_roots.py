@@ -7,14 +7,14 @@ import json
 import pytest
 
 from llm_fakes import FakeProvider, ok_response
+from corpus_data import corpus_sha
 from taintwalk.analysis.callgraph import build_graph, downward_closure, plan_walk
 from taintwalk.analysis.walk_all import read_program_list, read_roots, walk_command
 from taintwalk.analysis.walker import walk_program, walk_report
 from taintwalk.config import REPO_ROOT, load_config
 
 # A real corpus sha, so the name layer of the gate runs; the program contents are synthetic.
-SHA = json.loads((REPO_ROOT / load_config()["extract"]["out_dir"] / "programs" / "tw-0015.json")
-                 .read_text(encoding="utf-8"))["binary"]["sha256"]
+SHA = corpus_sha("tw-0015")  # committed manifest: same value, needs no runs/ data (D-043)
 BASE = 0x100000
 
 
