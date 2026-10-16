@@ -72,6 +72,7 @@ def programs():
     return tuple(json.loads(f.read_text(encoding="utf-8")) for f in files)
 
 
+@pytest.mark.corpus
 def test_empty_context_is_byte_identical_to_the_phase5_prompts():
     run = REPO_ROOT / "runs" / "p5-gate"
     rows = sorted((run / "summaries").glob("*.json"))
@@ -207,6 +208,7 @@ def _maximal_summaries():
     return out
 
 
+@pytest.mark.corpus
 def test_rendered_vocabulary_is_gate_clean_for_every_binary():
     maximal = _maximal_summaries()
     stubs = [("recursive_pending", ""), ("out_of_scope", ""), ("decompile_failed", ""), ("failed", "max_tokens")]
@@ -220,6 +222,7 @@ def test_rendered_vocabulary_is_gate_clean_for_every_binary():
         assert_clean(ctx.text, binary_sha256=prog["binary"]["sha256"])
 
 
+@pytest.mark.corpus
 def test_callee_budget_fits_the_preflight_budget_for_every_function():
     cap = load_config()["walk"]["callee_context_max_chars"]
     worst, n = 0, 0

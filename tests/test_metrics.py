@@ -161,6 +161,7 @@ def test_joins_fail_closed():
         score_binary(FINDINGS, two_bad, {**SUCC, "0xb0": ()}, ENTRY)
 
 
+@pytest.mark.corpus
 def test_score_runs_fails_closed_on_a_label_file_for_another_binary(tmp_path):
     run = REPO_ROOT / "runs/p6-gate"
     sha = json.loads((run / "walk.json").read_text(encoding="utf-8"))["binary_sha256"]
@@ -173,6 +174,7 @@ def test_score_runs_fails_closed_on_a_label_file_for_another_binary(tmp_path):
         score_runs([run], manifest=manifest, labels_dir=tmp_path, programs_dir=PROGRAMS)
 
 
+@pytest.mark.corpus
 def test_path_structure_audit_over_the_whole_corpus():
     totals = {"binaries": 0, "bad_roots": 0, "good_roots": 0}
     problems = []

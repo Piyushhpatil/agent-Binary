@@ -87,6 +87,7 @@ def test_missing_entries_are_counted_and_bad_keys_rejected(tmp_path):
         cache_entry(cache, "zz")
 
 
+@pytest.mark.corpus
 def test_cost_of_the_phase6_gate_walk_from_the_real_cache():
     """Corpus-dependent (fails, never skips): 13 walked functions, 12 with a no-context row."""
     arms = cost_report(P6)["arms"]

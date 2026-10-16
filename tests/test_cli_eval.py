@@ -1,6 +1,7 @@
 """`taintwalk eval` is listed by the CLI and forwards to eval/pipeline.py (Phase 8, D-032)."""
 from __future__ import annotations
 
+import pytest
 import shutil
 import subprocess
 import sys
@@ -23,6 +24,7 @@ def test_eval_is_listed_and_its_help_comes_from_the_pipeline():
     assert sub.returncode == 0 and "--replay-check" in sub.stdout and "--full" in sub.stdout
 
 
+@pytest.mark.corpus
 def test_eval_runs_the_pipeline(tmp_path):
     progs = tmp_path / "programs"
     progs.mkdir()

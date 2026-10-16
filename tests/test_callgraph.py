@@ -119,6 +119,7 @@ def _brute_sccs(nodes, succ) -> set[frozenset[str]]:
     return {frozenset({a} | {b for b in reach[a] if a in reach[b]}) for a in nodes}
 
 
+@pytest.mark.corpus
 def test_corpus_tarjan_matches_brute_force_and_spike_counts():
     d = REPO_ROOT / load_config()["extract"]["out_dir"] / "programs"
     files = sorted(d.glob("*.json"))

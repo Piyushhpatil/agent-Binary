@@ -3,6 +3,7 @@ binary): every section renders, the output is deterministic, the full gate refus
 command-line entry replays offline and loads no provider module. Corpus-dependent: fails, never skips."""
 from __future__ import annotations
 
+import pytest
 import json
 import shutil
 import subprocess
@@ -36,6 +37,7 @@ def _kw(tmp_path, **over):
     return kw
 
 
+@pytest.mark.corpus
 def test_every_section_renders_and_a_rerun_is_byte_identical(tmp_path):
     kw = _kw(tmp_path)
     rc, ev = run_eval(**kw)
@@ -58,6 +60,7 @@ def test_every_section_renders_and_a_rerun_is_byte_identical(tmp_path):
     assert (tmp_path / "o" / "eval.json").read_bytes() == first_ev
 
 
+@pytest.mark.corpus
 def test_the_local_only_gate_requires_r1_to_r5_on_636_roots(tmp_path):
     rc, ev = run_eval(**_kw(tmp_path, full=True))
     assert rc == 1
@@ -65,6 +68,7 @@ def test_the_local_only_gate_requires_r1_to_r5_on_636_roots(tmp_path):
     assert not any("R6" in p or "R7" in p for p in ev["problems"])
 
 
+@pytest.mark.corpus
 def test_cli_replays_offline_and_loads_no_provider_module(tmp_path):
     progs = _progs(tmp_path)
     proc = subprocess.run(

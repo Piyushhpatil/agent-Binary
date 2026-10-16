@@ -2,6 +2,7 @@
 abstentions, and no provider module loaded."""
 from __future__ import annotations
 
+import pytest
 import copy
 import json
 import subprocess
@@ -65,6 +66,7 @@ def test_literal_shortcut_counts_outcomes_by_label(tmp_path):
     assert out["bad"]["with_literal"]["n"] == 0 and out["bad"]["without_literal"]["abstain"] == 1
 
 
+@pytest.mark.corpus
 def test_worksheet_shows_what_the_model_saw(tmp_path):
     """Corpus-dependent (fails, never skips). tw-0015's roots are forced into FP and FN to exercise the page."""
     score = score_rung(llm_rung_doc(P6, "R5"), manifest=load_manifest(), labels_dir=LABELS, programs_dir=PROGRAMS)
@@ -77,6 +79,7 @@ def test_worksheet_shows_what_the_model_saw(tmp_path):
     assert "Callee block the walk showed the model" in md
 
 
+@pytest.mark.corpus
 def test_abstentions_and_reasons_match_the_walk():
     walk = json.loads((P6 / "walk.json").read_text(encoding="utf-8"))
     failed = sum(f["status"] != "ok" for f in walk["functions"].values())

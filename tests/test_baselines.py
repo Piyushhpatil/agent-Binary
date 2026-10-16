@@ -85,6 +85,7 @@ def test_the_pinned_flawfinder_version_is_enforced(tmp_path, monkeypatch):
 
 # ---- R4-R7 from a real walk (corpus-dependent: fails, never skips) ------------------------
 
+@pytest.mark.corpus
 def test_no_context_arm_takes_baseline_rows_where_the_walk_had_context():
     walk = json.loads((P6 / "walk.json").read_text(encoding="utf-8"))
     sha = walk["binary_sha256"]
@@ -97,11 +98,13 @@ def test_no_context_arm_takes_baseline_rows_where_the_walk_had_context():
     assert any(r4[a] != r5[a] for a in with_ctx)             # context moved something (D-026 amendment)
 
 
+@pytest.mark.corpus
 def test_an_llm_rung_refuses_a_run_from_the_other_provider():
     with pytest.raises(RungError, match="anthropic"):
         llm_rung_doc(P6, "R7")
 
 
+@pytest.mark.corpus
 def test_the_no_context_arm_fails_closed(tmp_path):
     d = tmp_path / "run"
     shutil.copytree(P6, d)
@@ -121,6 +124,7 @@ def test_the_no_context_arm_fails_closed(tmp_path):
 
 # ---- score_rung ---------------------------------------------------------------------------
 
+@pytest.mark.corpus
 def test_score_rung_scores_the_walk_arm_exactly_like_score_runs():
     kw = _kw()
     new = score_rung(llm_rung_doc(P6, "R5"), **kw)
@@ -131,6 +135,7 @@ def test_score_rung_scores_the_walk_arm_exactly_like_score_runs():
     assert new["diagnostics"] == old["diagnostics"] and new["roots_not_walked"] == 0
 
 
+@pytest.mark.corpus
 def test_rule_rungs_are_scored_on_the_same_roots(tmp_path):
     progs = tmp_path / "programs"
     progs.mkdir()

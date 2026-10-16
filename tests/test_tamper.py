@@ -60,11 +60,13 @@ def _one_entry(m: dict, e: dict, name: str, **override) -> Path:
     return p
 
 
+@pytest.mark.corpus
 def test_control_passes(ctx):
     m, e = ctx
     assert verify_corpus(_one_entry(m, e, "control")) == 0
 
 
+@pytest.mark.corpus
 def test_recompile_at_O1_is_caught(ctx):
     """A second compile (G1 violation) must fail the 3-way .text check."""
     m, e = ctx
@@ -85,6 +87,7 @@ def test_recompile_at_O1_is_caught(ctx):
     assert rc == 1
 
 
+@pytest.mark.corpus
 def test_never_stripped_copy_is_caught(ctx):
     """A 'stripped' file that still carries symbols must fail as stray sections."""
     m, e = ctx

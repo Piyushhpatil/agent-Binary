@@ -123,6 +123,7 @@ def test_trail_terminates_on_cycles(tmp_path):
     assert [(t["address"], t["depth"]) for t in by["0x20"]["trail"]] == [("0x10", 1)]
 
 
+@pytest.mark.corpus
 def test_real_runs_are_complete_and_gate_clean():
     p7 = [p.parent for p in sorted((REPO_ROOT / "runs/p7-walk").glob("tw-*/walk.json"))]
     assert len(p7) == 12, "the D-028 shakedown walks are missing"

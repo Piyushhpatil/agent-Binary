@@ -110,6 +110,7 @@ def _signal(lines: list[str]) -> list[str]:
     return [ln for ln in lines if not is_zero_store(ln) and not MARKER.match(ln)]
 
 
+@pytest.mark.corpus
 def test_corpus_collapse_removes_only_zero_stores():
     n_fn = n_touched = n_lines = c_before = c_after = 0
     for case, fn in _in_scope():
@@ -130,6 +131,7 @@ def test_corpus_collapse_removes_only_zero_stores():
     assert n_fn == EXPECT_IN_SCOPE
 
 
+@pytest.mark.corpus
 def test_worst_survey_case_collapses():
     fn = next(f for c, f in _in_scope() if c == "tw-0112" and f["addr"] == "0x193d")
     before = fn["pseudo_c"].split("\n")

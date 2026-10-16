@@ -57,6 +57,7 @@ def test_select_fails_closed_on_an_empty_external_cell():
         select_binaries(m)
 
 
+@pytest.mark.corpus
 def test_shakedown_on_the_real_corpus():
     rows = select_binaries(load_manifest())
     ext, fix = _shape(rows)
@@ -67,6 +68,7 @@ def test_shakedown_on_the_real_corpus():
         assert prog["binary"]["sha256"] == r["sha256"], r["case_id"]
 
 
+@pytest.mark.corpus
 def test_write_shakedown_keeps_labels_out_of_programs_txt(tmp_path):
     rows = write_shakedown(tmp_path, load_manifest(), PROGRAMS)
     text = (tmp_path / "programs.txt").read_text(encoding="utf-8")

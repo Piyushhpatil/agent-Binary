@@ -136,6 +136,7 @@ def test_a_failed_program_does_not_stop_the_batch_but_fails_its_exit_code(tmp_pa
 
 # ---- a real offline batch ----------------------------------------------------------------
 
+@pytest.mark.corpus
 def test_offline_batch_reproduces_shakedown_walks_byte_for_byte(tmp_path):
     """Corpus-dependent: fails, never skips, without runs/p7-walk. --offline means this replay
     cannot reach a model, and byte-identical summaries.json shows the batch path adds nothing."""

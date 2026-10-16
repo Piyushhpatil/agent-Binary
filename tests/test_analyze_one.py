@@ -64,6 +64,7 @@ def _run(tw0001, replies, tmp_path):
 
 # ---- runner -----------------------------------------------------------------------------
 
+@pytest.mark.corpus
 def test_single_function_end_to_end(tw0001, tmp_path):
     sha, _, addr = tw0001
     prov, row = _run(tw0001, [VALID], tmp_path)
@@ -79,18 +80,21 @@ def test_single_function_end_to_end(tw0001, tmp_path):
     assert json.loads((tmp_path / "analysis_report.json").read_text())["schema_valid"] == 1
 
 
+@pytest.mark.corpus
 def test_repair_is_recorded(tw0001, tmp_path):
     prov, row = _run(tw0001, [INVALID, VALID], tmp_path)
     assert row["status"] == "ok" and row["repaired"] and row["attempts"] == 2
     assert len(prov.sent) == 2
 
 
+@pytest.mark.corpus
 def test_schema_failure_is_recorded_and_fails_the_gate(tw0001, tmp_path):
     _, row = _run(tw0001, [INVALID, INVALID], tmp_path)
     assert row["status"] == "failed" and row["failure"] == "schema" and row["record"] is None
     assert analysis_report([row], tmp_path) == 1
 
 
+@pytest.mark.corpus
 def test_unknown_function_is_rejected(tw0001, tmp_path):
     sha, prog, _ = tw0001
     with pytest.raises(ValueError, match="not an in-scope function"):
@@ -110,6 +114,7 @@ def test_sample_file_carries_only_sha_and_addr(tmp_path):
             load_sample(bad)
 
 
+@pytest.mark.corpus
 def test_programs_index_by_sha():
     progs = load_programs(PROGRAMS)
     assert len(progs) == 240
@@ -117,6 +122,7 @@ def test_programs_index_by_sha():
 
 # ---- sampler (eval side) ----------------------------------------------------------------
 
+@pytest.mark.corpus
 def test_sample_selection_rules():
     sample, key = select_sample(LABELS, 20, seed=20260927)
     assert len(sample) == 20 and all(set(s) == {"sha256", "addr"} for s in sample)
@@ -130,6 +136,7 @@ def test_sample_selection_rules():
     assert select_sample(LABELS, 20, seed=1)[0] != sample
 
 
+@pytest.mark.corpus
 def test_sample_exclusion_gives_a_disjoint_held_out_set():
     dev, _ = select_sample(LABELS, 20, seed=20260927)
     used = {(s["sha256"], s["addr"]) for s in dev}

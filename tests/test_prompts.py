@@ -7,6 +7,7 @@ deterministic, on every in-scope function in the corpus. Corpus tests fail, not 
 when runs/p2-extract/programs is absent (same policy as test_tamper.py)."""
 from __future__ import annotations
 
+import pytest
 import json
 from pathlib import Path
 from typing import get_args
@@ -73,6 +74,7 @@ def test_system_describes_every_enum_value():
             assert v in SYSTEM, f"{v} is never described in the instructions"
 
 
+@pytest.mark.corpus
 def test_system_passes_the_gate_for_every_binary():
     assert_clean(SYSTEM, binary_sha256=None)
     shas = {p["binary"]["sha256"] for p in _programs()}
@@ -90,6 +92,7 @@ def test_numbering_and_blank_edges():
     assert "   1  void FUN_1(void)" in user and "   4  }" in user
 
 
+@pytest.mark.corpus
 def test_build_prompt_on_a_corpus_sample():
     # Every 10th binary (24 of 240), plus tw-0187, which holds the largest scored function
     # (pseudo-C survey). Gating all 11,029 prompts took ~50 s; gating every in-scope prompt
@@ -119,6 +122,7 @@ def test_build_prompt_on_a_corpus_sample():
     assert biggest <= 28544  # ollama preflight budget at num_ctx 16384 / num_predict 2048
 
 
+@pytest.mark.corpus
 def test_build_prompt_is_deterministic():
     prog = _programs()[0]
     fn = next(f for f in prog["functions"] if f["in_scope"])

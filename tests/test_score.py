@@ -3,6 +3,7 @@ Phase 6 gate run in a temp dir, so the test never writes into runs/. The CLI run
 because this pytest process has already imported taintwalk.llm through other tests."""
 from __future__ import annotations
 
+import pytest
 import shutil
 import subprocess
 import sys
@@ -18,6 +19,7 @@ def _score(*args) -> subprocess.CompletedProcess:
                           capture_output=True, text=True, cwd=REPO_ROOT, timeout=300)
 
 
+@pytest.mark.corpus
 def test_score_cli_is_deterministic_and_loads_no_provider(tmp_path):
     run = tmp_path / "gate"
     run.mkdir()

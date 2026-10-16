@@ -108,6 +108,7 @@ def test_the_local_only_family_is_six_tests_with_holm():
     assert sorted({t["comparison"] for t in out["tests"].values()}) == ["C2", "C3L", "C4L"]
 
 
+@pytest.mark.corpus
 def test_prompt_audit_on_the_phase6_gate_walk():
     """Corpus-dependent (fails, never skips): 12 functions with a no-context prompt."""
     a = audit_prompts(P6)
