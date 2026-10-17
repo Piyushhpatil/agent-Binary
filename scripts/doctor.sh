@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Pre-flight wrapper: confirms the venv and CLI exist, then runs `taintwalk doctor`.
-# Useful when the venv itself is what's broken.
+# Confirms the venv and CLI exist, then runs `taintwalk doctor`.
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV="$REPO_ROOT/.venv"
